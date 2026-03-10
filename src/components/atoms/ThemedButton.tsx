@@ -13,13 +13,13 @@ interface ThemedButtonProps extends Omit<PressableProps, 'children'> {
 
 const containerClassName: Record<ThemedButtonVariant, string> = {
   primary: 'bg-primary dark:bg-primaryDark',
-  secondary: 'bg-surface dark:bg-surfaceDark border border-border dark:border-borderDark',
+  secondary: 'bg-success/10 dark:bg-successDark/10 border border-success/30 dark:border-successDark/30',
   ghost: 'bg-transparent',
 };
 
 const labelTone: Record<ThemedButtonVariant, Parameters<typeof ThemedText>[0]['tone']> = {
   primary: 'default',
-  secondary: 'default',
+  secondary: 'success',
   ghost: 'primary',
 };
 
