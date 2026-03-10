@@ -1,19 +1,25 @@
 import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { ActivityIndicator, View } from 'react-native';
+import { useAuth } from '@clerk/clerk-expo';
 
-import { HomeScreen } from '@src/screens/Home/HomeScreen';
-
-export type RootStackParamList = {
-  Home: undefined;
-};
-
-const Stack = createNativeStackNavigator<RootStackParamList>();
+import { AuthNavigator } from '@src/navigation/AuthNavigator';
+import { AppNavigator } from '@src/navigation/AppNavigator';
+import { AuthProvider } from '@src/state/auth/AuthProvider';
 
 export const RootNavigator: React.FC = () => {
+  const { isSignedIn, isLoaded } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background dark:bg-backgroundDark">
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Home" component={HomeScreen} />
-    </Stack.Navigator>
+    <AuthProvider>
+      {isSignedIn ? <AppNavigator /> : <AuthNavigator />}
+    </AuthProvider>
   );
 };
-

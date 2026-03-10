@@ -11,10 +11,12 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { ThemedButton } from '@src/components/atoms/ThemedButton';
 import { ThemedText } from '@src/components/atoms/ThemedText';
 import { ThemedView } from '@src/components/atoms/ThemedView';
+import type { AuthStackParamList } from '@src/navigation/AuthNavigator';
 
 const FEATURES: { emoji: string; label: string; color: string }[] = [
   { emoji: '🗓️', label: 'Sync time off', color: 'bg-primary/10' },
@@ -93,9 +95,16 @@ function FeatureChip({
   );
 }
 
-export const HomeScreen: React.FC = () => {
-  const handleSignIn = useCallback(() => {}, []);
-  const handleSignUp = useCallback(() => {}, []);
+type Props = NativeStackScreenProps<AuthStackParamList, 'Landing'>;
+
+export const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  const handleSignIn = useCallback(() => {
+    navigation.navigate('SignIn');
+  }, [navigation]);
+
+  const handleSignUp = useCallback(() => {
+    navigation.navigate('SignUp');
+  }, [navigation]);
 
   return (
     <ThemedView className="flex-1">
