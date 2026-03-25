@@ -19,9 +19,9 @@ import { ThemedView } from '@src/components/atoms/ThemedView';
 import type { AuthStackParamList } from '@src/navigation/AuthNavigator';
 
 const FEATURES: { emoji: string; label: string; color: string }[] = [
-  { emoji: '🗓️', label: 'Sync time off', color: 'bg-primary/10' },
-  { emoji: '👯', label: 'Plan with friends', color: 'bg-sun/10' },
-  { emoji: '✈️', label: 'Go together', color: 'bg-coral/10' },
+  { emoji: '🎙️', label: 'AI-generated podcasts', color: 'bg-primary/10' },
+  { emoji: '📻', label: 'Live radio channels', color: 'bg-success/10' },
+  { emoji: '📖', label: 'Deep-dive audiobooks', color: 'bg-danger/10' },
 ];
 
 function FloatingEmoji({
@@ -116,26 +116,26 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             entering={FadeInDown.delay(100).duration(500)}
             className="flex-row justify-center gap-8 pt-4"
           >
-            <FloatingEmoji emoji="🌴" delay={0} startY={0} />
-            <FloatingEmoji emoji="☀️" delay={300} startY={-6} />
-            <FloatingEmoji emoji="🏖️" delay={180} startY={2} />
-            <FloatingEmoji emoji="✈️" delay={450} startY={-4} />
+            <FloatingEmoji emoji="🎙️" delay={0} startY={0} />
+            <FloatingEmoji emoji="📻" delay={300} startY={-6} />
+            <FloatingEmoji emoji="🎧" delay={180} startY={2} />
+            <FloatingEmoji emoji="🎵" delay={450} startY={-4} />
           </Animated.View>
 
           {/* Hero text */}
           <View className="items-center gap-3 mt-6">
             <Animated.View entering={FadeInDown.delay(250).duration(500).springify()} className="items-center gap-1">
               <ThemedText variant="display" className="text-center leading-tight">
-                Your crew's next
+                Your personal
               </ThemedText>
               <ThemedText variant="display" className="text-center text-primary dark:text-primaryDark">
-                escape 🌊
+                AI radio 📻
               </ThemedText>
             </Animated.View>
 
             <Animated.View entering={FadeInDown.delay(400).duration(500)}>
               <ThemedText variant="headline" tone="muted" className="text-center">
-                Sync PTO, pick dates everyone loves,{'\n'}and actually go.
+                Pick a topic, choose your format,{'\n'}and let Grok do the rest.
               </ThemedText>
             </Animated.View>
           </View>
@@ -155,7 +155,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             entering={FadeInUp.delay(900).duration(500).springify()}
             className="gap-3 mt-8"
           >
-            <ThemedButton label="Let's go 🌴" variant="secondary" onPress={handleSignUp} />
+            <ThemedButton label="Start listening 🎧" variant="secondary" onPress={handleSignUp} />
             <ThemedButton label="Sign in" variant="ghost" onPress={handleSignIn} />
           </Animated.View>
 

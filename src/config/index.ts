@@ -1,5 +1,5 @@
 export const CONFIG = {
-  apiBaseUrl: '',
+  apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? '',
 } as const;
 
 export const DEBUG = {

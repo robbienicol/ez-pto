@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, TextInput, View } from 'react-native';
-import { useUser } from '@clerk/clerk-expo';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { useChangeEmail } from '@src/api/hooks/useChangeEmail';
 import { ThemedButton } from '@src/components/atoms/ThemedButton';
 import { ThemedText } from '@src/components/atoms/ThemedText';
 import { ThemedView } from '@src/components/atoms/ThemedView';
@@ -11,39 +11,32 @@ import type { ProfileStackParamList } from '@src/navigation/ProfileNavigator';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Settings'>;
 
-type EmailAddressLike = {
-  id: string;
-  prepareVerification?: (args: { strategy: 'email_code' }) => Promise<unknown>;
-  attemptVerification?: (args: { code: string }) => Promise<unknown>;
-};
-
-type UserLike = {
-  primaryEmailAddress?: { emailAddress?: string | null } | null;
-  emailAddresses?: EmailAddressLike[];
-  createEmailAddress?: (args: { emailAddress: string }) => Promise<EmailAddressLike>;
-  update?: (args: { primaryEmailAddressId: string }) => Promise<unknown>;
-  delete: () => Promise<unknown>;
-};
-
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { signOut } = useAuth();
-  const { user, isLoaded } = useUser();
-  const userLike: UserLike | null = (user as unknown as UserLike | null) ?? null;
-
-  const primaryEmail = userLike?.primaryEmailAddress?.emailAddress ?? null;
+  const {
+    isLoaded,
+    primaryEmail,
+    pendingEmailVerification,
+    sendEmailCode,
+    verifyEmailCodeAndPersist,
+    deleteAccount,
+    isSendingEmailCode,
+    isVerifyingEmailCode,
+    error: emailError,
+    reset: resetEmailChange,
+  } = useChangeEmail();
 
   const [newEmail, setNewEmail] = useState('');
   const [emailCode, setEmailCode] = useState('');
-  const [pendingEmailVerification, setPendingEmailVerification] = useState(false);
-  const [emailAddressId, setEmailAddressId] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isBusy = isSubmitting || isSendingEmailCode || isVerifyingEmailCode;
 
-  const canSendCode = useMemo(() => newEmail.trim().length > 3 && !isSubmitting, [isSubmitting, newEmail]);
+  const canSendCode = useMemo(() => newEmail.trim().length > 3 && !isBusy, [isBusy, newEmail]);
   const canVerifyCode = useMemo(
-    () => pendingEmailVerification && emailCode.trim().length > 0 && !isSubmitting,
-    [emailCode, isSubmitting, pendingEmailVerification],
+    () => pendingEmailVerification && emailCode.trim().length > 0 && !isBusy,
+    [emailCode, isBusy, pendingEmailVerification],
   );
 
   const handleBack = useCallback(() => {
@@ -64,8 +57,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   }, [signOut]);
 
   const handleDeleteAccount = useCallback(() => {
-    if (!userLike) return;
-
     Alert.alert(
       'Delete account?',
       'This cannot be undone.',
@@ -78,7 +69,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             setIsSubmitting(true);
             setError(null);
             try {
-              await userLike.delete();
+              await deleteAccount();
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : 'Something went wrong.';
               setError(message);
@@ -90,55 +81,29 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       ],
       { cancelable: true },
     );
-  }, [userLike]);
+  }, [deleteAccount]);
 
   const handleSendEmailCode = useCallback(async () => {
-    if (!userLike?.createEmailAddress) {
-      setError('Email changes are not available yet.');
-      return;
-    }
-    setIsSubmitting(true);
     setError(null);
+    resetEmailChange();
     try {
-      const created = await userLike.createEmailAddress({ emailAddress: newEmail.trim() });
-      await created.prepareVerification?.({ strategy: 'email_code' });
-
-      setEmailAddressId(created.id);
-      setPendingEmailVerification(true);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong.';
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
+      await sendEmailCode(newEmail);
+    } catch {
+      // React Query mutation retains the error; screen shows `emailError`.
     }
-  }, [newEmail, userLike]);
+  }, [newEmail, resetEmailChange, sendEmailCode]);
 
   const handleVerifyEmailCode = useCallback(async () => {
-    if (!userLike || !emailAddressId) return;
-    setIsSubmitting(true);
     setError(null);
+    resetEmailChange();
     try {
-      const emailAddress = userLike.emailAddresses?.find((e) => e.id === emailAddressId) ?? null;
-
-      if (!emailAddress) {
-        setError('Could not find that email address on your account.');
-        return;
-      }
-
-      await emailAddress.attemptVerification?.({ code: emailCode.trim() });
-      await userLike.update?.({ primaryEmailAddressId: emailAddressId });
-
-      setPendingEmailVerification(false);
+      await verifyEmailCodeAndPersist({ newEmail, code: emailCode });
       setEmailCode('');
       setNewEmail('');
-      setEmailAddressId(null);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong.';
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
+    } catch {
+      // React Query mutation retains the error; screen shows `emailError`.
     }
-  }, [emailAddressId, emailCode, userLike]);
+  }, [emailCode, newEmail, resetEmailChange, verifyEmailCodeAndPersist]);
 
   if (!isLoaded) {
     return (
@@ -161,6 +126,11 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           {error && (
             <ThemedText variant="caption" tone="danger">
               {error}
+            </ThemedText>
+          )}
+          {!error && emailError && (
+            <ThemedText variant="caption" tone="danger">
+              {emailError}
             </ThemedText>
           )}
 
@@ -209,11 +179,11 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
           <View className="bg-surface dark:bg-surfaceDark border border-border dark:border-borderDark rounded-2xl p-4 gap-3">
             <ThemedText variant="headline">Account</ThemedText>
-            <ThemedButton label="Sign out" variant="ghost" disabled={isSubmitting} onPress={handleSignOut} />
+            <ThemedButton label="Sign out" variant="ghost" disabled={isBusy} onPress={handleSignOut} />
             <ThemedButton
               label="Delete account"
               variant="secondary"
-              disabled={isSubmitting || !userLike}
+              disabled={isBusy}
               onPress={handleDeleteAccount}
             />
           </View>
