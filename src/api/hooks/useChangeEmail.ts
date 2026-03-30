@@ -33,10 +33,6 @@ const CHANGE_EMAIL_IN_DB = gql`
   }
 `;
 
-export function meQueryKey() {
-  return ['ME'] as const;
-}
-
 function normalizeEmail(email: string): string {
   return email.trim();
 }

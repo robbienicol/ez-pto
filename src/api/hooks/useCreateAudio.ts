@@ -101,7 +101,7 @@ function buildCreateAudioVariables(input: CreateAudioInput): CreateAudioVariable
   return base;
 }
 
-export function createAudioMutationKey(userId: string | null | undefined) {
+function createAudioMutationKey(userId: string | null | undefined) {
   return ['CREATE_AUDIO', userId ?? ''] as const;
 }
 
@@ -127,7 +127,6 @@ export function useCreateAudio() {
       return response.createAudio;
     },
   });
-  console.log('response', error);
 
   const errorMessage = useMemo(() => {
     if (!error) return null;
