@@ -96,7 +96,7 @@ function EmptyChannels() {
       <View className="items-center gap-1">
         <ThemedText variant="headline">No channels yet</ThemedText>
         <ThemedText variant="caption" tone="muted" className="text-center">
-          Create your first channel and Grok will start generating content for you.
+          Create your first channel and we will start generating content for you.
         </ThemedText>
       </View>
     </View>

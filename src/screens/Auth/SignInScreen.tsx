@@ -41,6 +41,10 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('SignUp');
   }, [navigation]);
 
+  const handleForgotPassword = useCallback(() => {
+    navigation.navigate('ForgotPassword');
+  }, [navigation]);
+
   return (
     <ThemedView className="flex-1">
       <SafeAreaView className="flex-1">
@@ -72,6 +76,8 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
             {error && (
               <ThemedText variant="caption" tone="danger">{error}</ThemedText>
             )}
+
+            <ThemedButton label="Forgot password?" variant="ghost" onPress={handleForgotPassword} />
 
             {isSubmitting ? (
               <ActivityIndicator />

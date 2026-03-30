@@ -21,6 +21,9 @@ const NOW_PLAYING = {
   emoji: '₿',
 };
 
+/** Scroll/content bottom inset so lists clear the floating mini player above the tab bar. */
+export const MINI_PLAYER_OVERLAP_PADDING = 88;
+
 const BAR_COUNT = 5;
 const BAR_DELAYS = [0, 120, 60, 200, 80];
 const BAR_DURATIONS = [400, 500, 350, 450, 380];
