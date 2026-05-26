@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
-import { SafeAreaView, View, Text } from 'react-native';
+import { ActivityIndicator, Image, View, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -15,24 +16,15 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { ThemedButton } from '@src/components/atoms/ThemedButton';
 import { ThemedText } from '@src/components/atoms/ThemedText';
-import { ThemedView } from '@src/components/atoms/ThemedView';
-import type { AuthStackParamList } from '@src/navigation/AuthNavigator';
+import { PixelLetsGoButton } from '@src/components/atoms/PixelLetsGoButton';
+import { StarryScreen } from '@src/components/atoms/StarryScreen';
+import { useSpotifyAuth } from '@src/state/spotify/SpotifyAuthProvider';
+import { useSpotifyTopData } from '@src/api/hooks/useSpotifyTopData';
+import type { AppStackParamList } from '@src/navigation/AppNavigator';
 
-const FEATURES: { emoji: string; label: string; color: string }[] = [
-  { emoji: '🎙️', label: 'AI-generated podcasts', color: 'bg-primary/10' },
-  { emoji: '📻', label: 'Live radio channels', color: 'bg-success/10' },
-  { emoji: '📖', label: 'Deep-dive audiobooks', color: 'bg-danger/10' },
-];
+type Props = NativeStackScreenProps<AppStackParamList, 'Home'>;
 
-function FloatingEmoji({
-  emoji,
-  delay,
-  startY,
-}: {
-  emoji: string;
-  delay: number;
-  startY: number;
-}) {
+function FloatingEmoji({ emoji, delay, startY }: { emoji: string; delay: number; startY: number }) {
   const translateY = useSharedValue(startY);
   const opacity = useSharedValue(0);
 
@@ -63,17 +55,7 @@ function FloatingEmoji({
   );
 }
 
-function FeatureChip({
-  emoji,
-  label,
-  color,
-  index,
-}: {
-  emoji: string;
-  label: string;
-  color: string;
-  index: number;
-}) {
+function FeatureChip({ emoji, label, color, index }: { emoji: string; label: string; color: string; index: number }) {
   const scale = useSharedValue(0.8);
 
   useEffect(() => {
@@ -83,84 +65,126 @@ function FeatureChip({
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <Animated.View
-      style={style}
-      className={`flex-row items-center gap-2 px-4 py-2.5 rounded-pill ${color} border border-border dark:border-borderDark`}
-    >
+    <Animated.View style={style} className={`flex-row items-center gap-2 px-4 py-2.5 rounded-pill ${color} border`}>
       <Text style={{ fontSize: 18 }}>{emoji}</Text>
-      <ThemedText variant="caption" className="font-nunito-semibold">
-        {label}
-      </ThemedText>
+      <ThemedText variant="caption" className="font-nunito-extrabold">{label}</ThemedText>
     </Animated.View>
   );
 }
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'Landing'>;
+const VIBES = [
+  { emoji: '🕺', label: 'Disco diva', color: 'bg-neonPink/15 border-neonPink/30' },
+  { emoji: '🎸', label: 'Rock rebel', color: 'bg-neonPurple/15 border-neonPurple/30' },
+  { emoji: '🌊', label: 'Chill surfer', color: 'bg-electricBlue/15 border-electricBlue/30' },
+];
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  const handleSignIn = useCallback(() => {
-    navigation.navigate('SignIn');
-  }, [navigation]);
+  const { isConnected, isLoading: authLoading, connect, disconnect } = useSpotifyAuth();
+  const { data: topData, isLoading: dataLoading, status: dataStatus } = useSpotifyTopData();
 
-  const handleSignUp = useCallback(() => {
-    navigation.navigate('SignUp');
-  }, [navigation]);
+  const isDataError = dataStatus === 'error';
+  const isReady = isConnected && !!topData;
+
+  const handlePress = useCallback(() => {
+    if (!isConnected) {
+      connect();
+      return;
+    }
+    if (isReady) {
+      navigation.navigate('Quiz');
+    }
+  }, [isConnected, isReady, connect, navigation]);
+
+  const handleReconnect = useCallback(async () => {
+    await disconnect();
+    connect();
+  }, [disconnect, connect]);
+
+  const buttonLabel = () => {
+    if (!isConnected) return 'Connect Spotify 🎧';
+    if (dataLoading) return 'Loading your music...';
+    if (isDataError) return 'Retry connection';
+    return "Let's go";
+  };
+
+  const showSpinner = isConnected && dataLoading;
 
   return (
-    <ThemedView className="flex-1">
+    <StarryScreen>
       <SafeAreaView className="flex-1">
         <View className="flex-1 px-6 pt-6 pb-10 justify-between">
 
-          {/* Floating emoji row */}
           <Animated.View
             entering={FadeInDown.delay(100).duration(500)}
             className="flex-row justify-center gap-8 pt-4"
           >
-            <FloatingEmoji emoji="🎙️" delay={0} startY={0} />
-            <FloatingEmoji emoji="📻" delay={300} startY={-6} />
+            <FloatingEmoji emoji="🕺" delay={0} startY={0} />
+            <FloatingEmoji emoji="🪩" delay={300} startY={-6} />
             <FloatingEmoji emoji="🎧" delay={180} startY={2} />
             <FloatingEmoji emoji="🎵" delay={450} startY={-4} />
           </Animated.View>
 
-          {/* Hero text */}
           <View className="items-center gap-3 mt-6">
-            <Animated.View entering={FadeInDown.delay(250).duration(500).springify()} className="items-center gap-1">
-              <ThemedText variant="display" className="text-center leading-tight">
-                Your personal
-              </ThemedText>
-              <ThemedText variant="display" className="text-center text-primary dark:text-primaryDark">
-                AI radio 📻
-              </ThemedText>
+            <Animated.View entering={FadeInDown.delay(250).duration(500).springify()} className="items-center">
+              <Image
+                source={require('../../../assets/logo.png')}
+                style={{ width: 400, height: 256 }}
+                resizeMode="contain"
+              />
             </Animated.View>
 
             <Animated.View entering={FadeInDown.delay(400).duration(500)}>
               <ThemedText variant="headline" tone="muted" className="text-center">
-                Pick a topic, choose your format,{'\n'}and let Grok do the rest.
+                Answer 10 questions.{'\n'}Get your perfect playlist.
               </ThemedText>
             </Animated.View>
           </View>
 
-          {/* Feature chips */}
           <Animated.View
             entering={FadeInUp.delay(500).duration(400)}
             className="flex-row flex-wrap justify-center gap-3 mt-6"
           >
-            {FEATURES.map((f, i) => (
-              <FeatureChip key={f.label} {...f} index={i} />
+            {VIBES.map((v, i) => (
+              <FeatureChip key={v.label} {...v} index={i} />
             ))}
           </Animated.View>
 
-          {/* CTA */}
           <Animated.View
             entering={FadeInUp.delay(900).duration(500).springify()}
             className="gap-3 mt-8"
           >
-            <ThemedButton label="Start listening 🎧" variant="secondary" onPress={handleSignUp} />
-            <ThemedButton label="Sign in" variant="ghost" onPress={handleSignIn} />
+            {isDataError && (
+              <ThemedText variant="caption" tone="muted" className="text-center">
+                Couldn&apos;t load your Spotify data. Tap below to reconnect.
+              </ThemedText>
+            )}
+
+            <View className="relative">
+              <ThemedButton
+                label={buttonLabel()}
+                variant="primary"
+                showSelectionCursor={isReady && !showSpinner}
+                onPress={isDataError ? handleReconnect : handlePress}
+                disabled={showSpinner}
+              />
+              {showSpinner && (
+                <View className="absolute right-4 top-0 bottom-0 justify-center">
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              )}
+            </View>
+
+            {isConnected && (
+              <ThemedButton
+                label="Disconnect Spotify"
+                variant="ghost"
+                onPress={disconnect}
+              />
+            )}
           </Animated.View>
 
         </View>
       </SafeAreaView>
-    </ThemedView>
+    </StarryScreen>
   );
 };

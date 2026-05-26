@@ -1,22 +1,51 @@
 {
   "expo": {
-    "name": "AI Radio",
-    "slug": "ai-radio",
+    "name": "Ready Set Disco",
+    "slug": "ready-set-disco",
     "version": "1.0.0",
+    "scheme": "ready-set-disco",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.robbiehey.ready-set-disco",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.robbiehey.readysetdisco",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
     },
     "web": {
       "bundler": "metro"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0d0d1a"
+        }
+      ],
       "expo-font",
-      "expo-secure-store"
-    ]
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-image",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b3ad7ce0-834d-4c61-81d2-f12a5db65347"
+      }
+    },
+    "owner": "robbiehey"
   }
 }

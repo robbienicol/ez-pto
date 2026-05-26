@@ -13,19 +13,14 @@ import {
   Nunito_700Bold,
   Nunito_800ExtraBold,
 } from '@expo-google-fonts/nunito';
-import { ClerkProvider } from '@clerk/clerk-expo';
-import * as SecureStore from 'expo-secure-store';
+import { Righteous_400Regular } from '@expo-google-fonts/righteous';
+import { VT323_400Regular } from '@expo-google-fonts/vt323';
 
 import '@src/nativewindInterop';
 import { queryClient } from '@src/api/client/queryClient';
 import { RootNavigator } from '@src/navigation/RootNavigator';
 import { ThemeProvider, useTheme } from '@src/state/theme/ThemeProvider';
-
-const tokenCache = {
-  getToken: (key: string) => SecureStore.getItemAsync(key),
-  saveToken: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  clearToken: (key: string) => SecureStore.deleteItemAsync(key),
-};
+import { SpotifyAuthProvider } from '@src/state/spotify/SpotifyAuthProvider';
 
 function AppShell() {
   const { themeName } = useTheme();
@@ -47,20 +42,19 @@ export default function App() {
     Nunito_600SemiBold,
     Nunito_700Bold,
     Nunito_800ExtraBold,
+    Righteous_400Regular,
+    VT323_400Regular,
   });
 
   if (!fontsLoaded) return null;
 
   return (
-    <ClerkProvider
-      publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
-      tokenCache={tokenCache}
-    >
-      <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
+    <ThemeProvider initialMode="dark">
+      <QueryClientProvider client={queryClient}>
+        <SpotifyAuthProvider>
           <AppShell />
-        </QueryClientProvider>
-      </ThemeProvider>
-    </ClerkProvider>
+        </SpotifyAuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

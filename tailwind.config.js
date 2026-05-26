@@ -6,40 +6,50 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: '#F8FAFC',
-        backgroundDark: '#0B1220',
+        // Light mode
+        background: '#F0EEFF',
+        backgroundDark: '#02020F',
 
-        surface: '#FFFFFF',
-        surfaceDark: '#0F1B2D',
+        surface: '#EDE5FF',
+        surfaceDark: '#1414A8',
 
-        foreground: '#0F172A',
-        foregroundDark: '#E5E7EB',
+        foreground: '#1A0A2E',
+        foregroundDark: '#FFFFFF',
 
-        muted: '#64748B',
-        mutedDark: '#94A3B8',
+        muted: '#7B5EA7',
+        mutedDark: '#C0A8FF',
 
-        border: '#E2E8F0',
-        borderDark: '#24324A',
+        border: '#E91E8C',
+        borderDark: '#FF69B4',
 
-        primary: '#2563EB',
-        primaryDark: '#60A5FA',
+        // Primary: hot pink
+        primary: '#191970',
+        primaryDark: '#191970',
 
-        success: '#16A34A',
-        successDark: '#4ADE80',
+        success: '#00BFA5',
+        successDark: '#00E5C8',
 
-        danger: '#DC2626',
-        dangerDark: '#F87171',
+        danger: '#FF1744',
+        dangerDark: '#FF5177',
+
+        // Space / disco accents
+        gold: '#FFD700',
+        neonPink: '#FF69B4',
+        electricBlue: '#4444FF',
+        neonPurple: '#BF5FFF',
+        laserGreen: '#00E676',
+        starWhite: '#FFFFFF',
       },
       borderRadius: {
         card: '16px',
         pill: '9999px',
       },
       fontSize: {
-        display: ['32px', { lineHeight: '38px', letterSpacing: '-0.5px' }],
-        title: ['24px', { lineHeight: '30px', letterSpacing: '-0.25px' }],
-        headline: ['18px', { lineHeight: '24px' }],
+        display: ['36px', { lineHeight: '42px', letterSpacing: '0.5px' }],
+        title: ['24px', { lineHeight: '30px', letterSpacing: '0.1px' }],
+        headline: ['18px', { lineHeight: '24px', letterSpacing: '0.1px' }],
         body: ['16px', { lineHeight: '22px' }],
-        caption: ['13px', { lineHeight: '18px' }],
+        caption: ['15px', { lineHeight: '20px' }],
       },
       fontFamily: {
         nunito: ['Nunito_400Regular'],
@@ -47,12 +57,8 @@ module.exports = {
         'nunito-semibold': ['Nunito_600SemiBold'],
         'nunito-bold': ['Nunito_700Bold'],
         'nunito-extrabold': ['Nunito_800ExtraBold'],
-      },
-      colors: {
-        sun: '#F59E0B',
-        ocean: '#0EA5E9',
-        coral: '#F97316',
-        mint: '#10B981',
+        righteous: ['Righteous_400Regular'],
+        vt323: ['VT323_400Regular'],
       },
     },
   },

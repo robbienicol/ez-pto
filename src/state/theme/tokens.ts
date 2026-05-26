@@ -15,26 +15,26 @@ export interface ThemeTokens {
 
 export const lightTokens: ThemeTokens = {
   colors: {
-    background: '#F8FAFC',
-    surface: '#FFFFFF',
-    foreground: '#0F172A',
-    muted: '#64748B',
-    border: '#E2E8F0',
-    primary: '#2563EB',
-    success: '#16A34A',
-    danger: '#DC2626',
+    background: '#F0EEFF',
+    surface: '#EDE5FF',
+    foreground: '#1A0A2E',
+    muted: '#7B5EA7',
+    border: '#E91E8C',
+    primary: '#E91E8C',
+    success: '#00BFA5',
+    danger: '#FF1744',
   },
 };
 
 export const darkTokens: ThemeTokens = {
   colors: {
-    background: '#0B1220',
-    surface: '#0F1B2D',
-    foreground: '#E5E7EB',
-    muted: '#94A3B8',
-    border: '#24324A',
-    primary: '#60A5FA',
-    success: '#4ADE80',
-    danger: '#F87171',
+    background: '#02020F',
+    surface: '#1414A8',
+    foreground: '#FFFFFF',
+    muted: '#C0A8FF',
+    border: '#FF69B4',
+    primary: '#FF4DB3',
+    success: '#00E5C8',
+    danger: '#FF5177',
   },
 };

@@ -13,11 +13,11 @@ interface ThemedTextProps extends TextProps {
 }
 
 const variantClassName: Record<ThemedTextVariant, string> = {
-  display: 'text-display font-nunito-extrabold',
-  title: 'text-title font-nunito-bold',
-  headline: 'text-headline font-nunito-semibold',
+  display: 'text-display font-righteous',
+  title: 'text-title font-righteous',
+  headline: 'text-headline font-righteous',
   body: 'text-body font-nunito',
-  caption: 'text-caption font-nunito',
+  caption: 'text-caption font-vt323',
 };
 
 const toneClassName: Record<ThemedTextTone, string> = {

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useColorScheme } from 'nativewind';
 
 import { darkTokens, lightTokens, type ThemeName, type ThemeTokens } from './tokens';
@@ -22,6 +22,13 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, initialMode = 'system' }) => {
   const [mode, setModeState] = useState<ThemeMode>(initialMode);
   const { colorScheme, setColorScheme } = useColorScheme();
+  const syncedRef = useRef(false);
+  useEffect(() => {
+    if (!syncedRef.current && initialMode !== 'system') {
+      syncedRef.current = true;
+      setColorScheme(initialMode);
+    }
+  }, [initialMode, setColorScheme]);
 
   const setMode = useCallback(
     (nextMode: ThemeMode) => {
