@@ -72,10 +72,11 @@ function FeatureChip({ emoji, label, color, index }: { emoji: string; label: str
   );
 }
 
-const VIBES = [
-  { emoji: '🕺', label: 'Disco diva', color: 'bg-neonPink/15 border-neonPink/30' },
-  { emoji: '🎸', label: 'Rock rebel', color: 'bg-neonPurple/15 border-neonPurple/30' },
-  { emoji: '🌊', label: 'Chill surfer', color: 'bg-electricBlue/15 border-electricBlue/30' },
+const VALUE_PROPS = [
+  { emoji: '⚡', label: '10 questions', color: 'bg-gold/15 border-gold/30' },
+  { emoji: '🔓', label: 'No sign-up', color: 'bg-laserGreen/15 border-laserGreen/30' },
+  { emoji: '🆓', label: 'Always free', color: 'bg-neonPurple/15 border-neonPurple/30' },
+  { emoji: '🎵', label: 'Your Spotify', color: 'bg-electricBlue/15 border-electricBlue/30' },
 ];
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
@@ -133,10 +134,42 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
               />
             </Animated.View>
 
-            <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-              <ThemedText variant="headline" tone="muted" className="text-center">
-                Answer 10 questions.{'\n'}Get your perfect playlist.
-              </ThemedText>
+            <Animated.View entering={FadeInDown.delay(380).duration(500).springify()} className="w-full">
+              <View
+                style={{
+                  shadowColor: '#FF69B4',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.65,
+                  shadowRadius: 18,
+                  elevation: 10,
+                }}
+              >
+                <View
+                  style={{
+                    backgroundColor: 'rgba(10, 5, 35, 0.9)',
+                    borderWidth: 1.5,
+                    borderColor: '#E91E8C',
+                    borderRadius: 18,
+                    paddingVertical: 20,
+                    paddingHorizontal: 24,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: 'Righteous_400Regular',
+                      fontSize: 22,
+                      lineHeight: 32,
+                      color: '#FFFFFF',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {'Answer '}
+                    <Text style={{ color: '#FFD700' }}>10 questions</Text>
+                    {'.\nGet your perfect playlist.'}
+                  </Text>
+                </View>
+              </View>
             </Animated.View>
           </View>
 
@@ -144,7 +177,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             entering={FadeInUp.delay(500).duration(400)}
             className="flex-row flex-wrap justify-center gap-3 mt-6"
           >
-            {VIBES.map((v, i) => (
+            {VALUE_PROPS.map((v, i) => (
               <FeatureChip key={v.label} {...v} index={i} />
             ))}
           </Animated.View>
