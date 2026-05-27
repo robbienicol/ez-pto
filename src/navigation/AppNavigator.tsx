@@ -17,7 +17,7 @@ export const AppNavigator: React.FC = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="Quiz" component={QuizScreen} />
+      <Stack.Screen name="Quiz" component={QuizScreen} options={{ animation: 'none' }} />
       <Stack.Screen name="Results" component={ResultsScreen} />
     </Stack.Navigator>
   );

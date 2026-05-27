@@ -6,9 +6,9 @@ import * as SecureStore from 'expo-secure-store';
 WebBrowser.maybeCompleteAuthSession();
 
 const CLIENT_ID = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID ?? '';
-const SCOPES = ['user-top-read', 'user-read-recently-played', 'user-read-private'];
+const SCOPES = ['user-top-read', 'user-read-recently-played', 'user-read-private', 'playlist-modify-public', 'playlist-modify-private', 'ugc-image-upload'];
 const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'ready-set-disco', path: 'callback' });
-console.log('[Spotify] Redirect URI:', REDIRECT_URI);
+
 
 const discovery = {
   authorizationEndpoint: 'https://accounts.spotify.com/authorize',
@@ -36,7 +36,7 @@ export const SpotifyAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [isLoading, setIsLoading] = useState(true);
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    { clientId: CLIENT_ID, scopes: SCOPES, usePKCE: true, redirectUri: REDIRECT_URI },
+    { clientId: CLIENT_ID, scopes: SCOPES, usePKCE: true, redirectUri: REDIRECT_URI, extraParams: { show_dialog: 'true' } },
     discovery,
   );
 
@@ -76,16 +76,14 @@ export const SpotifyAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (tokenRes.refreshToken) {
         await SecureStore.setItemAsync(REFRESH_KEY, tokenRes.refreshToken);
       }
+      console.log('[SpotifyAuth] token exchanged | scopes granted:', tokenRes.scope ?? 'none returned');
       setAccessToken(tokenRes.accessToken);
-      console.log('[Spotify] ✅ Token exchanged successfully');
-
       const meRes = await fetch('https://api.spotify.com/v1/me', {
         headers: { Authorization: `Bearer ${tokenRes.accessToken}` },
       });
       const me = await meRes.json();
       await SecureStore.setItemAsync(USER_ID_KEY, me.id);
       setSpotifyUserId(me.id);
-      console.log(`[Spotify] ✅ Connected as ${me.display_name} (${me.id})`);
     })();
   }, [response]);
 

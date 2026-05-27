@@ -2,176 +2,316 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useSpotifyAuth } from '@src/state/spotify/SpotifyAuthProvider';
 import { useSpotifyTopData, type TopData } from './useSpotifyTopData';
+import { PLAYLIST_COVER_JPEG_BASE64 } from '@src/assets/playlistCover';
 
 const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 
-// ─── Answer label maps ─────────────────────────────────────────────────────────
+// ─── Answer label maps ────────────────────────────────────────────────────────
 
 const VIBE: Record<string, string> = {
-  tired: 'tired, needs something easy',
-  hype: 'ready to rage, high energy',
-  autopilot: 'on autopilot, background noise only',
-  warming_up: 'warming up, first drink in',
-  good_mood: 'good mood for no particular reason',
+  ready_to_disco: "ready to go, high energy, let's actually do this",
+  half_asleep: 'barely functioning, needs something easy and low-demand',
+  on_autopilot: 'on autopilot, just needs something on in the background',
+  feeling_creative: 'brain is alive and active, feeling inspired',
+  winding_down: 'coming in for a landing, slow and settling',
+};
+const MAINSTREAM: Record<string, string> = {
+  hits: 'only chart-toppers and widely-known songs — artists with tens of millions of streams, songs everyone recognises',
+  popular: 'well-known artists and songs but not just the obvious radio hits — go one layer below the surface',
+  deep_cuts: 'prefer b-sides, album tracks, and artists with smaller but dedicated fanbases — avoid the obvious choices',
+  obscure: 'seek out artists with under 500k monthly listeners, non-obvious deep cuts — nothing mainstream',
+};
+const ARTIST_WHY: Record<string, string> = {
+  obsessed: 'just obsessed with this artist right now',
+  vibes: "can't explain it, it just is",
+  genre: "it's the genre — the whole sound feels right",
+  lyrics: 'the lyrics — the words and voice matter right now',
 };
 const DISCOVERY: Record<string, string> = {
-  classics: 'familiar classics only',
-  familiar_fresh: 'similar to what they know but never heard it',
-  explore: 'wants to be surprised, somewhere completely new',
-  deep_cuts: 'deep cuts and forgotten songs',
+  safe: 'familiar territory only — no new artists',
+  sprinkle: 'mostly familiar with a light sprinkle of new',
+  half: 'half familiar, half new discoveries',
+  deep: 'full send — take me somewhere completely new',
 };
-const LOCATION: Record<string, string> = {
-  home_dark: 'in their room, lights low',
-  moving: 'out and moving — commute, walk, or gym',
-  desk: 'at their desk trying to be productive',
-  social: 'around people, semi-social',
-};
-const ATTENTION: Record<string, string> = {
-  full: 'full attention — music is the main activity',
-  half: 'half in — background but still tracking it',
-  background: 'barely listening, just needs something on',
-  variable: 'will zone in and out',
-};
-const EFFECT: Record<string, string> = {
-  match: "match the current mood, don't challenge it",
-  escape: 'pull them out of their head',
-  energise: "give them energy they don't currently have",
-  feel: "make them feel something they've been avoiding",
-};
-const DAY: Record<string, string> = {
-  busy: 'busy, needs to stay locked in',
-  free: 'free — nowhere to be',
-  social: 'social later — people at some point',
-  unknown: 'unknown, could go either way',
-};
-const PLAYBACK: Record<string, string> = {
-  shuffle: 'shuffle everything, chaos is fine',
-  radio: 'artist radio — one artist and let it ride',
-  curated: 'trust a human curator',
-  repeat: 'one song on repeat until done',
+const VOCALS: Record<string, string> = {
+  vocals: 'lyrics and vocals matter right now',
+  instrumental: 'instrumental only — no vocals',
+  either: 'no preference',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface SpotifyPlaylist {
+export interface GeneratedSong {
+  title: string;
+  artist: string;
+  uri: string | null;
+}
+
+export interface GeneratedPlaylist {
   id: string;
   name: string;
   description: string;
-  images: { url: string }[];
-  tracks?: { total: number };
   external_urls: { spotify: string };
-  owner: { display_name: string };
+  images: { url: string }[];
+  tracks: { total: number };
+  songs: GeneratedSong[];
 }
 
-// ─── Claude prompt ────────────────────────────────────────────────────────────
+// ─── OpenAI — generate 25 songs ──────────────────────────────────────────────
 
-function buildPrompt(answers: Record<string, string>, topData: TopData): string {
-  const topArtists = topData.artists.slice(0, 8).map(a => a.name).join(', ');
-  const topGenres = [...new Set(topData.artists.flatMap(a => a.genres))].slice(0, 6).join(', ');
-  const topTracks = topData.tracks.slice(0, 5).map(t => `${t.name} by ${t.artists[0]?.name}`).join(', ');
+function buildSongPrompt(answers: Record<string, string>, topData: TopData): string {
+  const isCustomArtist = answers.artist_lane?.startsWith('custom:');
+  const chosenArtist = isCustomArtist
+    ? null
+    : topData.artists.find(a => a.id === answers.artist_lane);
+  const artistName = chosenArtist?.name ?? (isCustomArtist ? answers.artist_lane.slice(7) : null);
+  const artistGenres = chosenArtist?.genres ?? [];
 
-  const chosenArtist = topData.artists.find(a => a.id === answers.artist_lane);
-  const chosenTrack = topData.tracks.find(t => t.id === answers.seed_track);
-  const skipArtist = topData.artists.find(a => a.id === answers.skip_artist);
+  const topArtistNames = topData.artists.slice(0, 8).map(a => a.name).join(', ');
+  const recentTracks = topData.tracks
+    .slice(0, 5)
+    .map(t => `"${t.name}" by ${t.artists[0]?.name}`)
+    .join(', ');
 
-  const lines = [
-    `You're a music expert helping find the perfect real Spotify playlist for right now.`,
+  const skipArtist = answers.skip_artist?.startsWith('custom:')
+    ? answers.skip_artist.slice(7)
+    : topData.artists.find(a => a.id === answers.skip_artist)?.name;
+
+  return [
+    `You are a music expert. Recommend exactly 25 real songs for this listener.`,
     ``,
-    `User's Spotify profile:`,
-    `- Top artists: ${topArtists || 'unknown'}`,
-    `- Top genres: ${topGenres || 'unknown'}`,
-    `- Tracks they love right now: ${topTracks || 'unknown'}`,
+    `LISTENER VIBE:`,
+    `- Feeling right now: ${VIBE[answers.current_vibe] ?? answers.current_vibe}`,
+    `- Song popularity preference: ${MAINSTREAM[answers.listening_scenario] ?? answers.listening_scenario}`,
+    `- Artist they're feeling: ${artistName ?? 'unspecified'}`,
+    artistGenres.length > 0 ? `- That artist's genres: ${artistGenres.join(', ')}` : '',
+    `- Why that artist: ${ARTIST_WHY[answers.artist_why] ?? answers.artist_why}`,
+    `- Vocals: ${VOCALS[answers.vocals] ?? 'no preference'}`,
+    `- New music discovery: ${DISCOVERY[answers.discovery] ?? answers.discovery}`,
+    skipArtist ? `- Skip this artist right now: ${skipArtist}` : '',
     ``,
-    `Their current situation:`,
-    `- Vibe: ${VIBE[answers.current_vibe] ?? answers.current_vibe}`,
-    `- Discovery appetite: ${DISCOVERY[answers.discovery] ?? answers.discovery}`,
-    `- Location: ${LOCATION[answers.location] ?? answers.location}`,
-    `- Music attention: ${ATTENTION[answers.attention] ?? answers.attention}`,
-    `- Want music to: ${EFFECT[answers.desired_effect] ?? answers.desired_effect}`,
-    `- Rest of day: ${DAY[answers.day_context] ?? answers.day_context}`,
-    `- Playback style: ${PLAYBACK[answers.playback_style] ?? answers.playback_style}`,
-    chosenArtist ? `- Artist calling to them right now: ${chosenArtist.name}` : '',
-    chosenTrack ? `- Would tap play on immediately: ${chosenTrack.name}` : '',
-    skipArtist ? `- Would skip right now even though they love them: ${skipArtist.name}` : '',
+    `THEIR MUSIC TASTE (for context — not a constraint):`,
+    `- Listens to: ${topArtistNames || 'unknown'}`,
+    `- Recent tracks: ${recentTracks || 'unknown'}`,
     ``,
-    `Give me exactly 3 Spotify playlist search queries that would find real, existing playlists perfect for this exact moment. Be specific — include mood, genre, and context so the search returns relevant results. Return a JSON object with a single key "queries" containing an array of 3 strings.`,
-  ].filter(l => l !== undefined);
-
-  return lines.join('\n');
+    `RULES:`,
+    `- Songs MUST match the chosen artist's genre. If they picked a country artist, give country songs.`,
+    `- No more than 3 songs per artist`,
+    `- Only recommend songs that actually exist and are on Spotify`,
+    `- STRICTLY apply the song popularity preference: 'hits' = only chart-toppers with 50M+ streams; 'popular' = well-known but not the obvious single; 'deep_cuts' = album tracks and artists under 5M monthly listeners; 'obscure' = artists under 500k monthly listeners, nothing mainstream`,
+    ``,
+    `Return JSON:`,
+    `{`,
+    `  "playlist_name": "short punchy name (max 5 words, no quotes)",`,
+    `  "playlist_description": "one sentence describing the vibe",`,
+    `  "songs": [`,
+    `    { "title": "exact song title", "artist": "exact artist name" }`,
+    `  ]`,
+    `}`,
+  ].filter(Boolean).join('\n');
 }
 
-// ─── API calls ────────────────────────────────────────────────────────────────
-
-async function fetchOpenAIQueries(prompt: string): Promise<string[]> {
+async function fetchSongRecommendations(
+  prompt: string,
+): Promise<{ playlist_name: string; playlist_description: string; songs: Array<{ title: string; artist: string }> }> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENAI_KEY}`,
-    },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      max_tokens: 200,
-      temperature: 0.7,
+      max_tokens: 1200,
+      temperature: 0.8,
     }),
   });
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`OpenAI ${res.status}: ${body.slice(0, 200)}`);
+    throw new Error(`OpenAI failed (${res.status}): ${body.slice(0, 200)}`);
   }
+
   const data = await res.json();
   const text: string = data.choices?.[0]?.message?.content ?? '{}';
-  const parsed = JSON.parse(text) as { queries?: string[] };
-  if (!Array.isArray(parsed.queries) || parsed.queries.length === 0) {
-    throw new Error('OpenAI returned unexpected format');
-  }
-  return parsed.queries;
+  const parsed = JSON.parse(text) as {
+    playlist_name?: string;
+    playlist_description?: string;
+    songs?: Array<{ title: string; artist: string }>;
+  };
+
+  const songs = parsed.songs ?? [];
+
+  return {
+    playlist_name: parsed.playlist_name ?? 'My Vibe Playlist',
+    playlist_description: parsed.playlist_description ?? '',
+    songs,
+  };
 }
 
-async function searchSpotifyPlaylist(query: string, accessToken: string): Promise<SpotifyPlaylist | null> {
-  const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist&limit=5&market=from_token`;
+// ─── Spotify — search for track URIs ─────────────────────────────────────────
+
+async function searchTrackUri(
+  title: string,
+  artist: string,
+  accessToken: string,
+): Promise<string | null> {
+  const q = encodeURIComponent(`track:${title} artist:${artist}`);
+  const url = `https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) return null;
-
   const data = await res.json();
-  const items: SpotifyPlaylist[] = (data.playlists?.items ?? []).filter(Boolean);
-
-  // Prefer official Spotify playlists, fall back to first result
-  return items.find(p => p.owner?.display_name === 'Spotify') ?? items[0] ?? null;
+  return data.tracks?.items?.[0]?.uri ?? null;
 }
 
-async function fetchRecommendedPlaylists(
+// ─── Spotify — create playlist ────────────────────────────────────────────────
+
+async function createSpotifyPlaylist(
+  name: string,
+  description: string,
+  accessToken: string,
+): Promise<string> {
+  const res = await fetch(`https://api.spotify.com/v1/me/playlists`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name, description, public: true }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Failed to create playlist (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  return data.id as string;
+}
+
+// ─── Spotify — add tracks ─────────────────────────────────────────────────────
+
+async function addTracksToPlaylist(
+  playlistId: string,
+  uris: string[],
+  accessToken: string,
+): Promise<void> {
+  // Spotify allows max 100 URIs per request
+  const chunks: string[][] = [];
+  for (let i = 0; i < uris.length; i += 100) chunks.push(uris.slice(i, i + 100));
+
+  for (const chunk of chunks) {
+    const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ uris: chunk }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.warn(`[Spotify] add tracks error:`, body.slice(0, 200));
+    }
+  }
+}
+
+// ─── Spotify — upload playlist cover ─────────────────────────────────────────
+
+async function uploadPlaylistCover(playlistId: string, accessToken: string): Promise<void> {
+  const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/images`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'image/jpeg',
+    },
+    body: PLAYLIST_COVER_JPEG_BASE64,
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    console.warn(`[Spotify] upload cover error:`, body.slice(0, 200));
+  }
+}
+
+// ─── Spotify — fetch playlist details (cover image etc.) ─────────────────────
+
+async function fetchPlaylistDetails(
+  playlistId: string,
+  accessToken: string,
+): Promise<{ images: { url: string }[]; external_urls: { spotify: string } }> {
+  const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return { images: [], external_urls: { spotify: `https://open.spotify.com/playlist/${playlistId}` } };
+  const data = await res.json();
+  return {
+    images: data.images ?? [],
+    external_urls: { spotify: data.external_urls?.spotify ?? `https://open.spotify.com/playlist/${playlistId}` },
+  };
+}
+
+// ─── Main pipeline ────────────────────────────────────────────────────────────
+
+async function createPlaylistFromVibe(
   answers: Record<string, string>,
   topData: TopData,
   accessToken: string,
-): Promise<SpotifyPlaylist[]> {
-  const prompt = buildPrompt(answers, topData);
-  const queries = await fetchOpenAIQueries(prompt);
+  spotifyUserId: string,
+): Promise<GeneratedPlaylist> {
+  // 1. Ask ChatGPT for 25 songs
+  const prompt = buildSongPrompt(answers, topData);
+  const { playlist_name, playlist_description, songs } = await fetchSongRecommendations(prompt);
 
-  const results = await Promise.all(queries.map(q => searchSpotifyPlaylist(q, accessToken)));
+  // 2. Search Spotify for each track URI (all in parallel)
+  const uriResults = await Promise.all(
+    songs.map(s => searchTrackUri(s.title, s.artist, accessToken)),
+  );
 
-  // Deduplicate by id and filter nulls
-  const seen = new Set<string>();
-  return results.filter((p): p is SpotifyPlaylist => {
-    if (!p || seen.has(p.id)) return false;
-    seen.add(p.id);
-    return true;
-  });
+  const foundUris = uriResults.filter((u): u is string => u !== null);
+  const songsWithUris: GeneratedSong[] = songs.map((s, i) => ({
+    title: s.title,
+    artist: s.artist,
+    uri: uriResults[i],
+  }));
+
+  // 3. Create the playlist
+  const playlistId = await createSpotifyPlaylist(
+    playlist_name,
+    playlist_description,
+    accessToken,
+  );
+
+  // 4. Add all found tracks
+  if (foundUris.length > 0) {
+    await addTracksToPlaylist(playlistId, foundUris, accessToken);
+  }
+
+  // 5. Upload the ez-pto logo as the playlist cover
+  await uploadPlaylistCover(playlistId, accessToken);
+
+  // 6. Fetch final playlist details (image, URL)
+  const details = await fetchPlaylistDetails(playlistId, accessToken);
+
+  return {
+    id: playlistId,
+    name: playlist_name,
+    description: playlist_description,
+    external_urls: details.external_urls,
+    images: details.images,
+    tracks: { total: foundUris.length },
+    songs: songsWithUris,
+  };
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function usePlaylistRecommendation(answers: Record<string, string>) {
-  const { accessToken } = useSpotifyAuth();
+  const { accessToken, spotifyUserId } = useSpotifyAuth();
   const { data: topData } = useSpotifyTopData();
 
+  const enabled = !!accessToken && !!topData && !!spotifyUserId;
+
   return useQuery({
-    queryKey: ['playlist-recommendation', answers],
-    queryFn: () => fetchRecommendedPlaylists(answers, topData!, accessToken!),
-    enabled: !!accessToken && !!topData,
+    queryKey: ['playlist-creation', answers],
+    queryFn: () => createPlaylistFromVibe(answers, topData!, accessToken!, spotifyUserId!),
+    enabled,
     staleTime: Infinity,
     retry: 1,
   });
