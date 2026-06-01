@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { PostHogProvider } from 'posthog-react-native';
 import {
   useFonts,
   Nunito_400Regular,
@@ -28,8 +29,12 @@ function AppShell() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <RootNavigator />
-        <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
+        <PostHogProvider apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? ''} options={{ host: 'https://us.i.posthog.com', captureScreens: false, debug: __DEV__ }}>
+          <SpotifyAuthProvider>
+            <RootNavigator />
+            <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
+          </SpotifyAuthProvider>
+        </PostHogProvider>
       </NavigationContainer>
     </SafeAreaProvider>
   );
@@ -51,9 +56,7 @@ export default function App() {
   return (
     <ThemeProvider initialMode="dark">
       <QueryClientProvider client={queryClient}>
-        <SpotifyAuthProvider>
-          <AppShell />
-        </SpotifyAuthProvider>
+        <AppShell />
       </QueryClientProvider>
     </ThemeProvider>
   );

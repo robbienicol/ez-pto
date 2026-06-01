@@ -15,7 +15,9 @@ import { StarryScreen } from '@src/components/atoms/StarryScreen';
 import { cn } from '@src/utils/cn';
 import { useTheme } from '@src/state/theme/ThemeProvider';
 import { useSpotifyTopData } from '@src/api/hooks/useSpotifyTopData';
-import type { SpotifyArtist, SpotifyTrack } from '@src/api/hooks/useSpotifyTopData';
+import type { SpotifyArtist } from '@src/api/hooks/useSpotifyTopData';
+import { useFocusEffect } from '@react-navigation/native';
+import { useAnalytics } from '@src/analytics';
 import type { AppStackParamList } from '@src/navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Quiz'>;
@@ -80,7 +82,7 @@ function pickDiverseArtists(artists: SpotifyArtist[], count: number, excludeIds?
   return picked;
 }
 
-function buildQuestions(artists: SpotifyArtist[], _tracks: SpotifyTrack[]): Question[] {
+function buildQuestions(artists: SpotifyArtist[]): Question[] {
   const laneOptions = pickDiverseArtists(artists, 8);
   const laneIds = new Set(laneOptions.map(a => a.id));
   const skipOptions = pickDiverseArtists(artists, 5, laneIds);
@@ -88,18 +90,17 @@ function buildQuestions(artists: SpotifyArtist[], _tracks: SpotifyTrack[]): Ques
   return [
     {
       id: 'current_vibe',
-      prompt: "What are the vibes like right now?",
+      prompt: "Pick a drink.",
       options: [
-        { label: 'Ready to disco', sublabel: "let's actually go", emoji: '🪩', value: 'ready_to_disco' },
-        { label: 'Half asleep', sublabel: 'barely functioning', emoji: '😴', value: 'half_asleep' },
-        { label: 'On autopilot', sublabel: 'just need something on', emoji: '🤖', value: 'on_autopilot' },
-        { label: 'Feeling creative', sublabel: 'brain is alive', emoji: '✨', value: 'feeling_creative' },
-        { label: 'Winding down', sublabel: 'coming in for a landing', emoji: '🌙', value: 'winding_down' },
+        { label: 'Whatever the cool kids drink', sublabel: "I'm at a party, let's dance", emoji: '🫧', value: 'ready_to_disco' },
+        { label: 'Just water', sublabel: 'just on autopilot idrc', emoji: '💧', value: 'on_autopilot' },
+        { label: 'Hot tea', sublabel: 'winding down, slow it down', emoji: '🍵', value: 'winding_down' },
+        { label: 'Sparkling water at 2am', sublabel: 'brain is alive, creative', emoji: '✨', value: 'feeling_creative' },
       ],
     },
     {
       id: 'artist_lane',
-      prompt: "Which artist is closest to what you want right now?",
+      prompt: "Hmm. Interesting choice. which artist are you feeling rn?",
       subtitle: 'go with your gut',
       options: laneOptions.map(a => ({
         label: a.name,
@@ -109,54 +110,54 @@ function buildQuestions(artists: SpotifyArtist[], _tracks: SpotifyTrack[]): Ques
       })),
     },
     {
-      id: 'listening_scenario',
-      prompt: "Hits or hidden gems?",
-      subtitle: 'how mainstream should we go',
-      options: [
-        { label: 'Only the hits', sublabel: 'songs everyone knows and loves', emoji: '🎯', value: 'hits' },
-        { label: 'Popular picks', sublabel: 'well-known but not overplayed', emoji: '📻', value: 'popular' },
-        { label: 'Deeper cuts', sublabel: 'b-sides and lesser-known artists', emoji: '🔍', value: 'deep_cuts' },
-        { label: 'Underground only', sublabel: 'avoid anything mainstream', emoji: '🌑', value: 'obscure' },
-      ],
-    },
-    {
       id: 'artist_why',
-      prompt: `What's making you gravitate there?`,
+      prompt: `Honestly vibes. What's making you gravitate there?`,
       options: [
         { label: "I'm just obsessed right now", sublabel: 'no further explanation needed', emoji: '🔥', value: 'obsessed' },
         { label: "The genre is fitting", sublabel: 'that whole sound feels right', emoji: '🎵', value: 'genre' },
-        { label: "The lyrics are key", sublabel: 'the words and voice matter right now', emoji: '🎤', value: 'lyrics' },
         { label: 'It just is', sublabel: "can't explain it", emoji: '🤷', value: 'vibes' },
+        { label: 'everyone is talking about it', sublabel: 'trending on socials', emoji: '🎤', value: 'lyrics' },
+      ],
+    },
+    {
+      id: 'era',
+      prompt: "What era would you go to if you could go back in time?",
+      options: [
+        { label: 'Timeless', sublabel: 'pre-90s, classic, vintage', emoji: '🎸', value: 'classic' },
+        { label: 'Throwback', sublabel: '90s and 2000s', emoji: '📼', value: 'throwback' },
+        { label: 'Recent', sublabel: '2010s', emoji: '📱', value: 'recent' },
+        { label: 'Right now', sublabel: 'current and fresh', emoji: '🔥', value: 'now' },
+      ],
+    },
+    {
+      id: 'listening_scenario',
+      prompt: "Lol honestly same. btw What sounds better right now?",
+      options: [
+        { label: 'Play the hits', sublabel: 'songs I know every word to', emoji: '🎤', value: 'singalong' },
+        { label: 'Mix it up', sublabel: 'some familiar, some Ive never heard', emoji: '🎵', value: 'popular' },
+        { label: 'Surprise me', sublabel: 'deep cuts and hidden gems only', emoji: '💎', value: 'deep_cuts' },
       ],
     },
     {
       id: 'skip_artist',
-      prompt: "Who would you most likely skip right now?",
+      prompt: "K cool. Who would you most likely skip right now?",
       subtitle: 'even if you love them normally',
       options: [
-        { label: 'Nobody — play it all', sublabel: "I'm in a broad mood", emoji: '🎵', value: 'none' },
         ...skipOptions.map(a => ({ label: a.name, sublabel: a.lane, emoji: '⏭️', value: a.id })),
-      ].slice(0, 5),
+        { label: 'Lolll no way I love them', sublabel: "Nice try but I would never skip them", emoji: '🎵', value: 'none' },
+
+      ].slice(0, 6),
     },
     {
       id: 'vocals',
-      prompt: 'Vocals or no vocals?',
+      prompt: 'Get outta here you love them! R U feeling Vocals or no vocals?',
       options: [
         { label: 'Give me lyrics', sublabel: 'words matter right now', emoji: '🎤', value: 'vocals' },
         { label: 'Instrumental only', sublabel: 'no words, just sound', emoji: '🎹', value: 'instrumental' },
         { label: 'Either works', sublabel: "I'm not fussed", emoji: '🎵', value: 'either' },
       ],
     },
-    {
-      id: 'discovery',
-      prompt: "How much music discovery are you feeling?",
-      options: [
-        { label: 'None — keep it safe', sublabel: 'familiar territory only', emoji: '🛡️', value: 'safe' },
-        { label: 'A little', sublabel: 'mostly mine, sprinkle of new', emoji: '🌱', value: 'sprinkle' },
-        { label: 'Half and half', sublabel: "I'm open", emoji: '⚖️', value: 'half' },
-        { label: 'Full send', sublabel: 'take me somewhere new', emoji: '🚀', value: 'deep' },
-      ],
-    },
+
   ].filter(q => q.options.length > 0);
 }
 
@@ -356,11 +357,12 @@ interface QuestionContentProps {
   question: Question;
   direction: 1 | -1;
   pendingSelection: string | null;
+  resolvedPrompt: string;
   resolvedSubtitle: string | null;
   onSelect: (value: string) => void;
 }
 
-function QuestionContent({ question, direction, pendingSelection, resolvedSubtitle, onSelect }: QuestionContentProps) {
+function QuestionContent({ question, direction, pendingSelection, resolvedPrompt, resolvedSubtitle, onSelect }: QuestionContentProps) {
   const { width: SCREEN_W } = useWindowDimensions();
   const slideX = useSharedValue(direction * SCREEN_W);
 
@@ -374,7 +376,7 @@ function QuestionContent({ question, direction, pendingSelection, resolvedSubtit
   return (
     <Animated.View style={animStyle} className="gap-6">
       <View className="gap-1.5">
-        <ThemedText variant="title">{question.prompt}</ThemedText>
+        <ThemedText variant="title">{resolvedPrompt}</ThemedText>
         {resolvedSubtitle ? (
           <ThemedText variant="body" tone="muted" className="font-vt323">
             {resolvedSubtitle}
@@ -408,6 +410,7 @@ function QuestionContent({ question, direction, pendingSelection, resolvedSubtit
 export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   const { tokens } = useTheme();
   const { data: topData } = useSpotifyTopData();
+  const analytics = useAnalytics();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
@@ -415,11 +418,17 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const questions = useMemo(
-    () => (topData ? buildQuestions(topData.artists, topData.tracks) : []),
+    () => (topData ? buildQuestions(topData.artists) : []),
     [topData],
   );
 
   const question = questions[currentIndex];
+
+  useFocusEffect(
+    useCallback(() => {
+      analytics.quizStarted();
+    }, [analytics]),
+  );
 
   useEffect(() => {
     return () => {
@@ -446,10 +455,11 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
           return;
         }
 
+        analytics.quizCompleted(nextAnswers);
         navigation.navigate('Results', { answers: nextAnswers });
       }, ADVANCE_AFTER_SELECT_MS);
     },
-    [answers, currentIndex, navigation, pendingSelection, question, questions],
+    [analytics, answers, currentIndex, navigation, pendingSelection, question, questions],
   );
 
   const handleBack = useCallback(() => {
@@ -470,6 +480,13 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
     if (question?.id === 'artist_why') return chosenArtistName;
     return question?.subtitle ?? null;
   }, [question, chosenArtistName]);
+
+  const resolvedPrompt = useMemo(() => {
+    if (question?.id === 'vocals' && answers.skip_artist === 'none') {
+      return 'LOL fair enough. Vocals or no vocals?';
+    }
+    return question?.prompt ?? '';
+  }, [question, answers.skip_artist]);
 
   if (!question) {
     return (
@@ -517,6 +534,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
                   question={question}
                   direction={slideDirection}
                   pendingSelection={pendingSelection}
+                  resolvedPrompt={resolvedPrompt}
                   resolvedSubtitle={resolvedSubtitle}
                   onSelect={handleSelect}
                 />

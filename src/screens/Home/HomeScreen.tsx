@@ -82,7 +82,7 @@ const VALUE_PROPS = [
 const SPIRAL_MS = 560;
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  const { isConnected, isLoading: authLoading, connect, disconnect } = useSpotifyAuth();
+  const { isConnected, connect, disconnect } = useSpotifyAuth();
   const { data: topData, isLoading: dataLoading, status: dataStatus } = useSpotifyTopData();
 
   const isDataError = dataStatus === 'error';
