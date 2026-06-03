@@ -7,7 +7,11 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "bump": "node scripts/bump-version.js",
+    "bump:minor": "node scripts/bump-version.js minor",
+    "bump:major": "node scripts/bump-version.js major",
+    "ship": "node scripts/bump-version.js && eas build --platform ios --profile production --auto-submit"
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.30",
