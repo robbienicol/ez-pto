@@ -11,8 +11,15 @@ const VIBE: Record<string, string> = {
   ready_to_disco: 'high energy, ready to go',
   half_asleep: 'low energy, barely functioning',
   on_autopilot: 'background listening, chill',
-  feeling_creative: 'inspired and creative',
+  road_soda: 'driving, on the move',
   winding_down: 'calm and winding down',
+};
+
+// Energy constraints injected into the has-artist prompt to prevent mismatched results
+const VIBE_ENERGY: Record<string, string> = {
+  ready_to_disco: 'high energy, party or social setting — the playlist MUST feel upbeat and energetic, nothing slow or sad',
+  road_soda: 'car/driving context — needs to work as a driving playlist, good forward momentum',
+  winding_down: 'slow and calm is exactly right here',
 };
 const MAINSTREAM: Record<string, string> = {
   hits: 'popular chart hits',
@@ -85,40 +92,57 @@ async function buildSearchQuery(
     : topData.artists.find(a => a.id === answers.artist_lane);
   const artistName = chosenArtist?.name ?? (isCustomArtist ? answers.artist_lane.slice(7) : null);
   const artistGenres = chosenArtist?.genres ?? [];
-
-  const vibeText = answers.current_vibe?.startsWith('custom:')
-    ? `Their drink choice is "${answers.current_vibe.slice(7)}" — infer the energy and mood this drink implies`
-    : (VIBE[answers.current_vibe] ?? answers.current_vibe);
-
   const hasArtist = !!artistName;
 
   const relatedNames = relatedArtists.map(a => a.name);
   const relatedGenres = [...new Set(relatedArtists.flatMap(a => a.genres))].slice(0, 6);
   const genreCluster = [...new Set([...artistGenres, ...relatedGenres])].slice(0, 6);
 
-  const prompt = [
-    `Generate a concise Spotify playlist search query (3-6 words) based on this listener's vibe.`,
-    ``,
-    hasArtist
-      ? `PRIMARY ANCHOR — Artist they chose: ${artistName}. The query MUST reflect this artist's sound. This is the most important signal.`
-      : null,
-    genreCluster.length > 0
-      ? `Genre cluster (from artist + similar artists): ${genreCluster.join(', ')} — use this as the core of the query`
-      : null,
-    relatedNames.length > 0
-      ? `Similar artists for reference: ${relatedNames.join(', ')}`
-      : null,
-    `Vibe modifier: ${vibeText}`,
-    `Popularity: ${MAINSTREAM[answers.listening_scenario] ?? answers.listening_scenario}`,
-    answers.vocals !== 'either' ? `Vocals: ${VOCALS[answers.vocals] ?? ''}` : '',
-    answers.era ? `Era: ${ERA[answers.era] ?? answers.era}` : '',
-    ``,
-    `Return JSON: { "query": "your search query here" }`,
-    hasArtist
-      ? `The query should capture the genre/sound of ${artistName} and similar artists. Focus on specific genre/mood terms from that cluster rather than artist names.`
-      : `Examples: "90s country classics", "late night jazz instrumental", "soft indie acoustic rainy day"`,
-    `Keep it 3-6 words. Include the era when relevant.`,
-  ].filter(Boolean).join('\n');
+  const aspect = !isCustomArtist && answers.artist_aspect?.startsWith('aspect:') && answers.artist_aspect !== 'aspect:all'
+    ? answers.artist_aspect.slice(7)
+    : null;
+
+  const eraText = answers.era ? ERA[answers.era] ?? answers.era : null;
+
+  let prompt: string;
+
+  if (hasArtist) {
+    prompt = [
+      `Generate a 3-6 word Spotify playlist search query to find playlists where ${artistName} would be curated alongside similar artists.`,
+      ``,
+      `Think: what would a human curator write as the name or description of a playlist that includes ${artistName}?`,
+      ``,
+      `Artist: ${artistName}`,
+      genreCluster.length > 0 ? `Genre cluster: ${genreCluster.join(', ')}` : null,
+      relatedNames.length > 0 ? `Similar artists: ${relatedNames.join(', ')}` : null,
+      aspect ? `The listener specifically connects with: ${aspect} — weight this heavily in the query` : null,
+      eraText ? `Era: ${eraText}` : null,
+      VIBE_ENERGY[answers.current_vibe] ? `Energy constraint: ${VIBE_ENERGY[answers.current_vibe]}` : null,
+      ``,
+      `Return JSON: { "query": "your search query here" }`,
+      `The query must sound like a real playlist title a human curator would write.`,
+      `Never use: "chill", "vibes", "relaxing", "good music", "playlist".`,
+      `Examples: "dreamy psych pop gems", "weirdo girl indie", "underground psych garage", "lo-fi bedroom discoveries"`,
+      `Keep it 3-6 words.`,
+    ].filter(Boolean).join('\n');
+  } else {
+    const vibeText = answers.current_vibe?.startsWith('custom:')
+      ? `Their drink choice is "${answers.current_vibe.slice(7)}" — infer the energy and mood this drink implies`
+      : (VIBE[answers.current_vibe] ?? answers.current_vibe);
+
+    prompt = [
+      `Generate a concise Spotify playlist search query (3-6 words) based on this listener's vibe.`,
+      ``,
+      `Vibe: ${vibeText}`,
+      `Popularity: ${MAINSTREAM[answers.listening_scenario] ?? answers.listening_scenario}`,
+      answers.vocals !== 'either' ? `Vocals: ${VOCALS[answers.vocals] ?? ''}` : null,
+      eraText ? `Era: ${eraText}` : null,
+      ``,
+      `Return JSON: { "query": "your search query here" }`,
+      `Examples: "90s country classics", "late night jazz instrumental", "soft indie acoustic rainy day"`,
+      `Keep it 3-6 words. Include the era when relevant.`,
+    ].filter(Boolean).join('\n');
+  }
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -175,7 +199,7 @@ async function fetchPlaylistPage(q: string, offset: number, accessToken: string)
   return (data.playlists?.items ?? []) as Array<RawPlaylist | null>;
 }
 
-const MAX_SAVES = 1000;
+const MAX_SAVES = 4000;
 
 async function fetchFollowerCount(playlistId: string, accessToken: string): Promise<number> {
   const res = await fetch(
@@ -277,6 +301,8 @@ async function findPlaylistsFromVibe(
     : [];
 
   const searchQuery = await buildSearchQuery(answers, topData, relatedArtists);
+  console.log('[playlist] answers:', JSON.stringify(answers, null, 2));
+  console.log('[playlist] query:', searchQuery);
   const playlists = await searchSpotifyPlaylists(searchQuery, accessToken, answers.listening_scenario ?? 'hits');
   return { searchQuery, playlists };
 }

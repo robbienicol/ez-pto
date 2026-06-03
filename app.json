@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ready Set Disco",
     "slug": "ready-set-disco",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "scheme": "ready-set-disco",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.robbiehey.ready-set-disco",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "LSApplicationQueriesSchemes": [
@@ -43,7 +43,8 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sharing"
     ],
     "extra": {
       "eas": {

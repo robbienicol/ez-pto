@@ -92,10 +92,10 @@ function buildQuestions(artists: SpotifyArtist[]): Question[] {
       id: 'current_vibe',
       prompt: "Pick a drink.",
       options: [
-        { label: 'Whatever the cool kids drink', sublabel: "I'm at a party, let's dance", emoji: '🫧', value: 'ready_to_disco' },
+        { label: 'Whatever the cool kids drink', sublabel: "I'm at a party, ive got the aux, let's dance", emoji: '🫧', value: 'ready_to_disco' },
         { label: 'Just water', sublabel: 'just on autopilot idrc', emoji: '💧', value: 'on_autopilot' },
         { label: 'Hot tea', sublabel: 'winding down, slow it down', emoji: '🍵', value: 'winding_down' },
-        { label: 'Sparkling water at 2am', sublabel: 'brain is alive, creative', emoji: '✨', value: 'feeling_creative' },
+        { label: 'Road soda', sublabel: "I'm in the car, windows optional", emoji: '🚗', value: 'road_soda' },
       ],
     },
     {
@@ -110,13 +110,18 @@ function buildQuestions(artists: SpotifyArtist[]): Question[] {
       })),
     },
     {
+      id: 'artist_aspect',
+      prompt: '',   // resolved at render time
+      options: [],  // resolved at render time
+    },
+    {
       id: 'artist_why',
-      prompt: `Honestly vibes. What's making you gravitate there?`,
+      prompt: "Someone asks what you're listening to. You:",
       options: [
-        { label: "I'm just obsessed right now", sublabel: 'no further explanation needed', emoji: '🔥', value: 'obsessed' },
-        { label: "The genre is fitting", sublabel: 'that whole sound feels right', emoji: '🎵', value: 'genre' },
-        { label: 'It just is', sublabel: "can't explain it", emoji: '🤷', value: 'vibes' },
-        { label: 'everyone is talking about it', sublabel: 'trending on socials', emoji: '🎤', value: 'lyrics' },
+        { label: 'Show them immediately', sublabel: 'no hesitation, good taste is meant to be shared', emoji: '📲', value: 'show_them' },
+        { label: 'Hard to explain tbh', sublabel: "you'd have to really know me", emoji: '🤔', value: 'hard_to_explain' },
+        { label: "I'd probably lie", sublabel: 'the real playlist stays private', emoji: '🫣', value: 'would_lie' },
+        { label: "I already made them a playlist", sublabel: 'been waiting for someone to ask', emoji: '🎁', value: 'made_them_playlist' },
       ],
     },
     {
@@ -159,8 +164,62 @@ function buildQuestions(artists: SpotifyArtist[]): Question[] {
       ],
     },
 
-  ].filter(q => q.options.length > 0);
+  ].filter(q => q.id === 'artist_aspect' || q.options.length > 0);
 }
+
+// ─── Artist aspect mapping ────────────────────────────────────────────────────
+
+const ASPECT_MAP: { keywords: string[]; label: string; sublabel: string }[] = [
+  { keywords: ['psychedel', 'psych'], label: 'The psychedelic side', sublabel: 'hazy, trippy, mind-bending' },
+  { keywords: ['dub', 'reggae'], label: 'The dub / bass side', sublabel: 'deep, spacious, bass-heavy' },
+  { keywords: ['garage', 'trash', 'noise'], label: 'The raw energy', sublabel: 'rough, unfiltered, lo-fi' },
+  { keywords: ['ambient', 'drone', 'atmospheric'], label: 'The atmospheric side', sublabel: 'spacious, immersive, textural' },
+  { keywords: ['lo-fi', 'bedroom', 'chillwave'], label: 'The bedroom sound', sublabel: 'intimate, home-recorded, fuzzy' },
+  { keywords: ['folk', 'acoustic', 'singer-songwriter'], label: 'The intimate side', sublabel: 'quiet, personal, acoustic' },
+  { keywords: ['electronic', 'synth', 'kraut', 'experimental'], label: 'The experimental side', sublabel: 'textural, electronic, weird' },
+  { keywords: ['hip hop', 'hip-hop', 'rap', 'trap', 'drill'], label: 'The hip-hop side', sublabel: 'beats, rhymes, flow' },
+  { keywords: ['r&b', 'soul', 'neo soul'], label: 'The soulful side', sublabel: 'smooth, emotive, rich' },
+  { keywords: ['dance', 'house', 'techno', 'edm'], label: 'The dance floor side', sublabel: 'driving, rhythmic, euphoric' },
+  { keywords: ['pop'], label: 'The catchy hooks', sublabel: 'melodic, earworm moments' },
+  { keywords: ['indie'], label: 'The indie edge', sublabel: 'off-center, eclectic' },
+  { keywords: ['rock', 'punk', 'post-punk', 'alternative', 'metal', 'hardcore'], label: 'The guitar energy', sublabel: 'driven, electric, edgy' },
+  { keywords: ['jazz', 'blues'], label: 'The jazzy side', sublabel: 'improvisational, soulful' },
+  { keywords: ['country', 'americana'], label: 'The americana side', sublabel: 'roots, stories, heartland' },
+];
+
+function buildAspectOptions(artist: SpotifyArtist): Option[] {
+  const options: Option[] = [];
+
+  for (const aspect of ASPECT_MAP) {
+    if (options.length >= 3) break;
+    if (artist.genres.some(g => aspect.keywords.some(kw => g.toLowerCase().includes(kw)))) {
+      options.push({
+        label: aspect.label,
+        sublabel: aspect.sublabel,
+        emoji: '✨',
+        value: `aspect:${aspect.label}`,
+      });
+    }
+  }
+
+  // Fallback if genres are too niche to match — keep the question always useful
+  if (options.length === 0) {
+    options.push(
+      { label: 'The sound / genre', sublabel: 'the musical style and aesthetic', emoji: '🎵', value: 'aspect:genre' },
+      { label: 'The mood / energy', sublabel: 'how it makes me feel', emoji: '⚡', value: 'aspect:energy' },
+    );
+  }
+
+  options.push({ label: 'The whole vibe', sublabel: 'all of it, honestly', emoji: '🎶', value: 'aspect:all' });
+  return options;
+}
+
+const BUZZFEED_OPTIONS: Option[] = [
+  { label: 'You cry at music', sublabel: 'a good song just hits different', emoji: '😭', value: 'aspect:emotional' },
+  { label: 'You curate everything', sublabel: 'vibes must be just right', emoji: '🎯', value: 'aspect:curator' },
+  { label: "You don't skip", sublabel: 'you let the whole thing play out', emoji: '🔁', value: 'aspect:immersive' },
+  { label: 'You find gems first', sublabel: 'you heard it before it was cool', emoji: '💎', value: 'aspect:discoverer' },
+];
 
 // ─── Analysis log ─────────────────────────────────────────────────────────────
 
@@ -457,7 +516,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
         }
 
         analytics.quizCompleted(nextAnswers);
-        navigation.navigate('Results', { answers: nextAnswers });
+        navigation.navigate('Personality', { answers: nextAnswers });
       }, ADVANCE_AFTER_SELECT_MS);
     },
     [analytics, answers, currentIndex, navigation, pendingSelection, question, questions],
@@ -477,17 +536,40 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
     return topData?.artists.find(a => a.id === answers.artist_lane)?.name ?? null;
   }, [answers.artist_lane, topData]);
 
+  const resolvedAspectQuestion = useMemo(() => {
+    const artistId = answers.artist_lane && !answers.artist_lane.startsWith('custom:')
+      ? answers.artist_lane
+      : null;
+    const artist = artistId ? topData?.artists.find(a => a.id === artistId) : null;
+    if (artist) {
+      return {
+        prompt: `What part of ${artist.name} is speaking to you right now?`,
+        options: buildAspectOptions(artist),
+      };
+    }
+    return {
+      prompt: 'Real talk. Which one is you?',
+      options: BUZZFEED_OPTIONS,
+    };
+  }, [answers.artist_lane, topData]);
+
+  const activeQuestion = useMemo(() => {
+    if (!question || question.id !== 'artist_aspect') return question;
+    return { ...question, options: resolvedAspectQuestion.options };
+  }, [question, resolvedAspectQuestion]);
+
   const resolvedSubtitle = useMemo(() => {
     if (question?.id === 'artist_why') return chosenArtistName;
     return question?.subtitle ?? null;
   }, [question, chosenArtistName]);
 
   const resolvedPrompt = useMemo(() => {
+    if (question?.id === 'artist_aspect') return resolvedAspectQuestion.prompt;
     if (question?.id === 'vocals' && answers.skip_artist === 'none') {
       return 'LOL fair enough. Vocals or no vocals?';
     }
     return question?.prompt ?? '';
-  }, [question, answers.skip_artist]);
+  }, [question, answers.skip_artist, resolvedAspectQuestion]);
 
   if (!question) {
     return (
@@ -532,7 +614,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
               <View style={{ overflow: 'hidden' }}>
                 <QuestionContent
                   key={question.id}
-                  question={question}
+                  question={activeQuestion ?? question}
                   direction={slideDirection}
                   pendingSelection={pendingSelection}
                   resolvedPrompt={resolvedPrompt}

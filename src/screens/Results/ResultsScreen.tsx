@@ -164,9 +164,7 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
           <View className="gap-1">
             <ThemedText variant="caption" tone="muted">your vibe, your playlist</ThemedText>
             <ThemedText variant="display">Ready Set Disco 🪩</ThemedText>
-            <ThemedText variant="body" tone="muted" style={{ marginTop: 4 }}>
-              Searched: "{result.searchQuery}"
-            </ThemedText>
+       
           </View>
 
           {/* Playlist cards */}
@@ -230,6 +228,10 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
             <ThemedButton label="Start over" variant="primary" onPress={handleStartOver} />
             <ThemedButton label="Disconnect Spotify" variant="ghost" onPress={handleDisconnect} />
           </View>
+
+          <ThemedText variant="caption" tone="muted" style={{ textAlign: 'center', marginTop: 4 }}>
+            questions, complaints, or ideas? find us @readysetdisco on tiktok
+          </ThemedText>
         </ScrollView>
       </SafeAreaView>
 
