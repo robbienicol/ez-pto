@@ -127,6 +127,7 @@ function buildQuestions(artists: SpotifyArtist[]): Question[] {
         { label: 'Throwback', sublabel: '90s and 2000s', emoji: '📼', value: 'throwback' },
         { label: 'Recent', sublabel: '2010s', emoji: '📱', value: 'recent' },
         { label: 'Right now', sublabel: 'current and fresh', emoji: '🔥', value: 'now' },
+        { label: 'Idc, pick for me', sublabel: 'whatever feels right', emoji: '🎲', value: 'surprise' },
       ],
     },
     {

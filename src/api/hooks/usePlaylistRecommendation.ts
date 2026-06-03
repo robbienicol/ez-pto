@@ -33,6 +33,7 @@ const ERA: Record<string, string> = {
   throwback: '1990s and 2000s',
   recent:    '2010s',
   now:       'current, 2020s, recent releases',
+  surprise:  'any era — pick whatever best fits the overall vibe',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,11 +53,31 @@ export interface PlaylistSearchResult {
   playlists: SpotifyPlaylistResult[];
 }
 
+// ─── Spotify — related artists ────────────────────────────────────────────────
+
+interface RelatedArtist {
+  name: string;
+  genres: string[];
+}
+
+async function fetchRelatedArtists(artistId: string, accessToken: string): Promise<RelatedArtist[]> {
+  const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}/related-artists`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return ((data.artists ?? []) as RelatedArtist[]).slice(0, 4).map(a => ({
+    name: a.name,
+    genres: a.genres ?? [],
+  }));
+}
+
 // ─── OpenAI — generate search query ──────────────────────────────────────────
 
 async function buildSearchQuery(
   answers: Record<string, string>,
   topData: TopData,
+  relatedArtists: RelatedArtist[],
 ): Promise<string> {
   const isCustomArtist = answers.artist_lane?.startsWith('custom:');
   const chosenArtist = isCustomArtist
@@ -69,19 +90,34 @@ async function buildSearchQuery(
     ? `Their drink choice is "${answers.current_vibe.slice(7)}" — infer the energy and mood this drink implies`
     : (VIBE[answers.current_vibe] ?? answers.current_vibe);
 
+  const hasArtist = !!artistName;
+
+  const relatedNames = relatedArtists.map(a => a.name);
+  const relatedGenres = [...new Set(relatedArtists.flatMap(a => a.genres))].slice(0, 6);
+  const genreCluster = [...new Set([...artistGenres, ...relatedGenres])].slice(0, 6);
+
   const prompt = [
     `Generate a concise Spotify playlist search query (3-6 words) based on this listener's vibe.`,
     ``,
-    `Vibe: ${vibeText}`,
-    `Artist/genre they want: ${artistName ?? 'unspecified'}`,
-    artistGenres.length > 0 ? `Genres: ${artistGenres.slice(0, 3).join(', ')}` : '',
+    hasArtist
+      ? `PRIMARY ANCHOR — Artist they chose: ${artistName}. The query MUST reflect this artist's sound. This is the most important signal.`
+      : null,
+    genreCluster.length > 0
+      ? `Genre cluster (from artist + similar artists): ${genreCluster.join(', ')} — use this as the core of the query`
+      : null,
+    relatedNames.length > 0
+      ? `Similar artists for reference: ${relatedNames.join(', ')}`
+      : null,
+    `Vibe modifier: ${vibeText}`,
     `Popularity: ${MAINSTREAM[answers.listening_scenario] ?? answers.listening_scenario}`,
     answers.vocals !== 'either' ? `Vocals: ${VOCALS[answers.vocals] ?? ''}` : '',
     answers.era ? `Era: ${ERA[answers.era] ?? answers.era}` : '',
     ``,
     `Return JSON: { "query": "your search query here" }`,
-    `Examples: "90s country classics", "late night jazz instrumental", "soft indie acoustic rainy day"`,
-    `Do not include artist names. Focus on genre, mood, era, or energy level. Include the era in the query when relevant.`,
+    hasArtist
+      ? `The query should capture the genre/sound of ${artistName} and similar artists. Focus on specific genre/mood terms from that cluster rather than artist names.`
+      : `Examples: "90s country classics", "late night jazz instrumental", "soft indie acoustic rainy day"`,
+    `Keep it 3-6 words. Include the era when relevant.`,
   ].filter(Boolean).join('\n');
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -139,14 +175,30 @@ async function fetchPlaylistPage(q: string, offset: number, accessToken: string)
   return (data.playlists?.items ?? []) as Array<RawPlaylist | null>;
 }
 
+// Curated-size filter: 200–2000 tracks = likely human-curated. Applied for non-mainstream scenarios.
+// For hits/singalong we skip the filter since large editorial playlists are expected.
+const CURATED_MIN = 200;
+const CURATED_MAX = 2000;
+
+function isCuratedSize(playlist: RawPlaylist): boolean {
+  const total = playlist.tracks?.total ?? 0;
+  return total >= CURATED_MIN && total <= CURATED_MAX;
+}
+
 // Map listening_scenario to a fractional start position within the result pool.
 // obscure gets the bottom of the list, hits the top, others scale linearly between.
 function pickByScenario(playlists: RawPlaylist[], scenario: string): RawPlaylist[] {
   const n = playlists.length;
   if (n === 0) return [];
 
+  const wantCurated = scenario === 'obscure' || scenario === 'discovery' || scenario === 'deep_cuts';
+  const filtered = wantCurated ? playlists.filter(isCuratedSize) : playlists;
+  // Fall back to unfiltered if the size filter wiped everything out
+  const pool = filtered.length > 0 ? filtered : playlists;
+  const m = pool.length;
+
   if (scenario === 'obscure' || scenario === 'discovery') {
-    return [...playlists].slice(Math.max(0, n - 3)).reverse();
+    return [...pool].slice(Math.max(0, m - 3)).reverse();
   }
 
   const startFraction: Record<string, number> = {
@@ -157,8 +209,8 @@ function pickByScenario(playlists: RawPlaylist[], scenario: string): RawPlaylist
     deep_cuts: 0.55,
   };
   const frac = startFraction[scenario] ?? 0;
-  const startIdx = Math.min(Math.floor(n * frac), Math.max(0, n - 3));
-  return playlists.slice(startIdx, startIdx + 3);
+  const startIdx = Math.min(Math.floor(m * frac), Math.max(0, m - 3));
+  return pool.slice(startIdx, startIdx + 3);
 }
 
 async function searchSpotifyPlaylists(
@@ -203,7 +255,16 @@ async function findPlaylistsFromVibe(
   topData: TopData,
   accessToken: string,
 ): Promise<PlaylistSearchResult> {
-  const searchQuery = await buildSearchQuery(answers, topData);
+  const isCustomArtist = answers.artist_lane?.startsWith('custom:');
+  const chosenArtist = isCustomArtist
+    ? null
+    : topData.artists.find(a => a.id === answers.artist_lane);
+
+  const relatedArtists = chosenArtist
+    ? await fetchRelatedArtists(chosenArtist.id, accessToken)
+    : [];
+
+  const searchQuery = await buildSearchQuery(answers, topData, relatedArtists);
   const playlists = await searchSpotifyPlaylists(searchQuery, accessToken, answers.listening_scenario ?? 'hits');
   return { searchQuery, playlists };
 }

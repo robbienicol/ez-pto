@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.robbiehey.ready-set-disco",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": ["spotify"]
       }
     },
     "android": {

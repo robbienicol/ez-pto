@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, Share, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -18,10 +18,9 @@ function PlaylistCard({ playlist }: { playlist: SpotifyPlaylistResult }) {
   const coverUrl = playlist.images?.[0]?.url;
 
   const handleOpen = useCallback(() => {
-    const uri = `spotify://playlist/${playlist.id}`;
-    Linking.canOpenURL(uri).then(canOpen =>
-      Linking.openURL(canOpen ? uri : playlist.external_urls.spotify),
-    );
+    Linking.openURL(`spotify://playlist/${playlist.id}`).catch(() => {
+      Linking.openURL(playlist.external_urls.spotify);
+    });
   }, [playlist]);
 
   return (
@@ -78,7 +77,7 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [status, result, analytics]);
 
   const goToQuiz = useCallback(() => {
-    navigation.reset({ index: 0, routes: [{ name: 'Quiz' }] });
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [navigation]);
 
   const handleStartOver = useCallback(() => {
@@ -189,20 +188,38 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
               <ThemedText variant="caption" tone="muted">
                 {rating === null ? 'did you like your playlist?' : rating === 'thumbs_up' ? 'glad you liked it!' : 'noted — we\'ll do better'}
               </ThemedText>
-              <View style={{ flexDirection: 'row', gap: 20 }}>
+              <View style={{ flexDirection: 'row', gap: 16 }}>
                 <Pressable
                   onPress={() => handleRate('thumbs_up')}
                   accessibilityLabel="Thumbs up"
-                  style={{ opacity: rating !== null && rating !== 'thumbs_up' ? 0.3 : 1 }}
+                  style={{
+                    opacity: rating !== null && rating !== 'thumbs_up' ? 0.3 : 1,
+                    borderWidth: 2,
+                    borderColor: '#00E676',
+                    paddingHorizontal: 20,
+                    paddingVertical: 8,
+                    backgroundColor: rating === 'thumbs_up' ? 'rgba(0, 230, 118, 0.2)' : 'transparent',
+                  }}
                 >
-                  <ThemedText style={{ fontSize: 36 }}>👍</ThemedText>
+                  <Text style={{ fontFamily: 'VT323_400Regular', fontSize: 28, color: '#00E676', letterSpacing: 1 }}>
+                    [[ YES ]]
+                  </Text>
                 </Pressable>
                 <Pressable
                   onPress={() => handleRate('thumbs_down')}
                   accessibilityLabel="Thumbs down"
-                  style={{ opacity: rating !== null && rating !== 'thumbs_down' ? 0.3 : 1 }}
+                  style={{
+                    opacity: rating !== null && rating !== 'thumbs_down' ? 0.3 : 1,
+                    borderWidth: 2,
+                    borderColor: '#FF4DB3',
+                    paddingHorizontal: 20,
+                    paddingVertical: 8,
+                    backgroundColor: rating === 'thumbs_down' ? 'rgba(255, 77, 179, 0.2)' : 'transparent',
+                  }}
                 >
-                  <ThemedText style={{ fontSize: 36 }}>👎</ThemedText>
+                  <Text style={{ fontFamily: 'VT323_400Regular', fontSize: 28, color: '#FF4DB3', letterSpacing: 1 }}>
+                    [[ NAH ]]
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -210,7 +227,7 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Actions */}
           <View className="gap-3 mt-2">
-            <ThemedButton label="Find more playlists" variant="primary" onPress={handleStartOver} />
+            <ThemedButton label="Start over" variant="primary" onPress={handleStartOver} />
             <ThemedButton label="Disconnect Spotify" variant="ghost" onPress={handleDisconnect} />
           </View>
         </ScrollView>
