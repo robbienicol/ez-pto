@@ -175,30 +175,28 @@ async function fetchPlaylistPage(q: string, offset: number, accessToken: string)
   return (data.playlists?.items ?? []) as Array<RawPlaylist | null>;
 }
 
-// Curated-size filter: 200–2000 tracks = likely human-curated. Applied for non-mainstream scenarios.
-// For hits/singalong we skip the filter since large editorial playlists are expected.
-const CURATED_MIN = 200;
-const CURATED_MAX = 2000;
+const MAX_SAVES = 1000;
 
-function isCuratedSize(playlist: RawPlaylist): boolean {
-  const total = playlist.tracks?.total ?? 0;
-  return total >= CURATED_MIN && total <= CURATED_MAX;
+async function fetchFollowerCount(playlistId: string, accessToken: string): Promise<number> {
+  const res = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}?fields=followers`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) return Infinity;
+  const data = await res.json();
+  return (data.followers?.total as number | undefined) ?? Infinity;
 }
+
+type RawPlaylistWithFollowers = RawPlaylist & { followerCount: number };
 
 // Map listening_scenario to a fractional start position within the result pool.
 // obscure gets the bottom of the list, hits the top, others scale linearly between.
-function pickByScenario(playlists: RawPlaylist[], scenario: string): RawPlaylist[] {
-  const n = playlists.length;
-  if (n === 0) return [];
-
-  const wantCurated = scenario === 'obscure' || scenario === 'discovery' || scenario === 'deep_cuts';
-  const filtered = wantCurated ? playlists.filter(isCuratedSize) : playlists;
-  // Fall back to unfiltered if the size filter wiped everything out
-  const pool = filtered.length > 0 ? filtered : playlists;
-  const m = pool.length;
+function pickByScenario(playlists: RawPlaylistWithFollowers[], scenario: string): RawPlaylistWithFollowers[] {
+  const m = playlists.length;
+  if (m === 0) return [];
 
   if (scenario === 'obscure' || scenario === 'discovery') {
-    return [...pool].slice(Math.max(0, m - 3)).reverse();
+    return [...playlists].slice(Math.max(0, m - 3)).reverse();
   }
 
   const startFraction: Record<string, number> = {
@@ -206,11 +204,10 @@ function pickByScenario(playlists: RawPlaylist[], scenario: string): RawPlaylist
     singalong: 0,
     popular:   0.25,
     nostalgic: 0.25,
-    deep_cuts: 0.55,
   };
   const frac = startFraction[scenario] ?? 0;
   const startIdx = Math.min(Math.floor(m * frac), Math.max(0, m - 3));
-  return pool.slice(startIdx, startIdx + 3);
+  return playlists.slice(startIdx, startIdx + 3);
 }
 
 async function searchSpotifyPlaylists(
@@ -237,7 +234,22 @@ async function searchSpotifyPlaylists(
       return true;
     });
 
-  return pickByScenario(candidates, scenario).map(item => ({
+  const followerCounts = await Promise.all(
+    candidates.map(p => fetchFollowerCount(p.id, accessToken)),
+  );
+
+  const withFollowers: RawPlaylistWithFollowers[] = candidates.map((p, i) => ({
+    ...p,
+    followerCount: followerCounts[i]!,
+  }));
+
+  // Keep only hidden gems; if none qualify, fall back to the least-saved ones
+  const gems = withFollowers.filter(p => p.followerCount < MAX_SAVES);
+  const pool = gems.length > 0
+    ? gems
+    : [...withFollowers].sort((a, b) => a.followerCount - b.followerCount).slice(0, 5);
+
+  return pickByScenario(pool, scenario).map(item => ({
     id: item.id,
     name: item.name,
     description: item.description ?? '',
