@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { ActivityIndicator, Image, View, Text } from 'react-native';
+import { ActivityIndicator, Image, Pressable, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
@@ -82,7 +82,7 @@ const VALUE_PROPS = [
 const SPIRAL_MS = 560;
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
-  const { isConnected, connect, disconnect } = useSpotifyAuth();
+  const { isConnected, isDemoMode, connect, connectAsGuest, disconnect } = useSpotifyAuth();
   const { data: topData, isLoading: dataLoading, status: dataStatus } = useSpotifyTopData();
 
   const isDataError = dataStatus === 'error';
@@ -169,11 +169,14 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <Animated.View style={spiralStyle}>
       <StarryScreen>
         <SafeAreaView className="flex-1">
+          {!isConnected && (
+            <ThemedButton label="Try without Spotify" variant="ghost" onPress={connectAsGuest} />
+          )}
           <View className="flex-1 px-6 pt-6 pb-10 justify-between">
 
             <Animated.View
               entering={FadeInDown.delay(100).duration(500)}
-              className="flex-row justify-center gap-8 pt-4"
+              className="flex-row justify-center gap-8"
             >
               <FloatingEmoji emoji="🕺" delay={0} startY={0} />
               <FloatingEmoji emoji="🪩" delay={300} startY={-6} />
@@ -265,11 +268,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
               {isConnected && (
                 <ThemedButton
-                  label="Disconnect Spotify"
+                  label={isDemoMode ? 'Exit demo' : 'Disconnect Spotify'}
                   variant="ghost"
                   onPress={disconnect}
                 />
               )}
+
             </Animated.View>
 
           </View>

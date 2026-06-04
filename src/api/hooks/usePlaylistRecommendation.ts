@@ -284,6 +284,41 @@ async function searchSpotifyPlaylists(
   }));
 }
 
+// ─── Demo mode mock playlists ─────────────────────────────────────────────────
+
+const DEMO_PLAYLIST_RESULT: PlaylistSearchResult = {
+  searchQuery: 'indie electronic dream pop',
+  playlists: [
+    {
+      id: 'demo_p1',
+      name: 'late night frequencies',
+      description: 'electronic and indie for the hours when everything slows down',
+      external_urls: { spotify: 'https://open.spotify.com/genre/indie-page' },
+      images: [],
+      tracks: { total: 42 },
+      owner: { display_name: 'indiecurator', id: 'indiecurator' },
+    },
+    {
+      id: 'demo_p2',
+      name: 'bedroom pop essentials',
+      description: 'intimate, lo-fi, and just a little hazy',
+      external_urls: { spotify: 'https://open.spotify.com/genre/lofi-page' },
+      images: [],
+      tracks: { total: 38 },
+      owner: { display_name: 'vibesonly', id: 'vibesonly' },
+    },
+    {
+      id: 'demo_p3',
+      name: 'underground sounds',
+      description: 'hidden gems from the edges of indie and electronic',
+      external_urls: { spotify: 'https://open.spotify.com/genre/electronic-page' },
+      images: [],
+      tracks: { total: 55 },
+      owner: { display_name: 'discoverymode', id: 'discoverymode' },
+    },
+  ],
+};
+
 // ─── Main pipeline ────────────────────────────────────────────────────────────
 
 async function findPlaylistsFromVibe(
@@ -318,6 +353,7 @@ export function usePlaylistRecommendation(answers: Record<string, string>) {
   return useQuery({
     queryKey: ['playlist-search', answers],
     queryFn: async () => {
+      if (accessToken === '__demo__') return DEMO_PLAYLIST_RESULT;
       const freshToken = await ensureValidToken();
       if (!freshToken) throw new Error('Spotify session expired — please reconnect.');
       return findPlaylistsFromVibe(answers, topData!, freshToken);

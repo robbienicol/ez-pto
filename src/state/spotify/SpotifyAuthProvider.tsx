@@ -46,8 +46,10 @@ interface SpotifyAuthContextValue {
   accessToken: string | null;
   spotifyUserId: string | null;
   isConnected: boolean;
+  isDemoMode: boolean;
   isLoading: boolean;
   connect: () => void;
+  connectAsGuest: () => void;
   disconnect: () => Promise<void>;
   ensureValidToken: () => Promise<string | null>;
 }
@@ -58,6 +60,7 @@ export const SpotifyAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const posthog = usePostHog();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [spotifyUserId, setSpotifyUserId] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
@@ -147,6 +150,12 @@ export const SpotifyAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
     promptAsync();
   }, [promptAsync]);
 
+  const connectAsGuest = useCallback(() => {
+    setIsDemoMode(true);
+    setAccessToken('__demo__');
+    setSpotifyUserId('demo_user');
+  }, []);
+
   const disconnect = useCallback(async () => {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(REFRESH_KEY);
@@ -154,6 +163,7 @@ export const SpotifyAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
     await SecureStore.deleteItemAsync(USER_ID_KEY);
     setAccessToken(null);
     setSpotifyUserId(null);
+    setIsDemoMode(false);
   }, []);
 
   // Call this before any write operation to guarantee a fresh token
@@ -175,7 +185,7 @@ export const SpotifyAuthProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   return (
     <SpotifyAuthContext.Provider
-      value={{ accessToken, spotifyUserId, isConnected: !!accessToken, isLoading, connect, disconnect, ensureValidToken }}
+      value={{ accessToken, spotifyUserId, isConnected: !!accessToken, isDemoMode, isLoading, connect, connectAsGuest, disconnect, ensureValidToken }}
     >
       {children}
     </SpotifyAuthContext.Provider>
