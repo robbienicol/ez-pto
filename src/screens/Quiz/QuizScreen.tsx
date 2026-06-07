@@ -14,11 +14,17 @@ import { ThemedText } from '@src/components/atoms/ThemedText';
 import { StarryScreen } from '@src/components/atoms/StarryScreen';
 import { cn } from '@src/utils/cn';
 import { useTheme } from '@src/state/theme/ThemeProvider';
-import { useSpotifyTopData } from '@src/api/hooks/useSpotifyTopData';
-import type { SpotifyArtist } from '@src/api/hooks/useSpotifyTopData';
+import { useArtistPreferences } from '@src/state/artistPreferences/ArtistPreferencesProvider';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAnalytics } from '@src/analytics';
 import type { AppStackParamList } from '@src/navigation/AppNavigator';
+
+const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
+
+interface GenreData {
+  correctedName: string;
+  genres: string[];
+}
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Quiz'>;
 
@@ -36,61 +42,32 @@ interface Question {
   options: Option[];
 }
 
-// ─── Genre bucketing ─────────────────────────────────────────────────────────
+// ─── Static question options ──────────────────────────────────────────────────
 
-const BUCKETS: { key: string; label: string; keywords: string[] }[] = [
-  { key: 'rap', label: 'rap / hip-hop', keywords: ['hip hop', 'hip-hop', 'rap', 'trap', 'drill', 'grime'] },
-  { key: 'rb', label: 'r&b / soul', keywords: ['r&b', 'soul', 'neo soul', 'alternative r&b', 'indie r&b'] },
-  { key: 'rock', label: 'rock / punk', keywords: ['rock', 'punk', 'metal', 'alternative', 'grunge', 'hardcore', 'post-punk', 'indie rock', 'emo'] },
-  { key: 'country', label: 'country / folk', keywords: ['country', 'folk', 'americana', 'singer-songwriter', 'acoustic'] },
-  { key: 'electronic', label: 'electronic / dance', keywords: ['electronic', 'dance', 'house', 'techno', 'edm', 'dubstep', 'synth'] },
-  { key: 'pop', label: 'pop', keywords: ['pop', 'teen pop', 'dance pop'] },
-  { key: 'indie', label: 'indie / chill', keywords: ['indie', 'indie pop', 'lo-fi', 'dream pop', 'chillwave'] },
-  { key: 'latin', label: 'latin', keywords: ['latin', 'reggaeton', 'salsa'] },
+const ARTIST_ASPECT_OPTIONS: Option[] = [
+  { label: 'the genre', sublabel: 'sounds like nothing else', emoji: '🎶', value: 'aspect:genre' },
+  { label: 'the tempo', sublabel: 'it just hits at the right speed', emoji: '⚡', value: 'aspect:tempo' },
+  { label: "its what the cool kids are listening to", sublabel: 'i have taste, obviously', emoji: '😎', value: 'aspect:cool' },
+  { label: "why are you asking so many questions? am i under arrest?", sublabel: '', emoji: '🚔', value: 'aspect:arrested' },
 ];
 
-function assignBucket(artist: SpotifyArtist): string | null {
-  for (const bucket of BUCKETS) {
-    if (artist.genres.some(g => bucket.keywords.some(kw => g.toLowerCase().includes(kw)))) {
-      return bucket.key;
-    }
-  }
-  return null;
-}
+function buildQuestions(favoriteArtists: string[], skipArtists: string[], genreOptions: Option[]): Question[] {
+  const laneOptions: Option[] = favoriteArtists.map(name => ({
+    label: name,
+    emoji: '🎵',
+    value: `custom:${name}`,
+  }));
 
-function pickDiverseArtists(artists: SpotifyArtist[], count: number, excludeIds?: Set<string>): Array<SpotifyArtist & { lane: string }> {
-  const bucketCounts = new Map<string, number>();
-  const picked: Array<SpotifyArtist & { lane: string }> = [];
-  const pickedIds = new Set<string>();
-  const pool = excludeIds ? artists.filter(a => !excludeIds.has(a.id)) : artists;
-
-  const tryAdd = (artist: SpotifyArtist, maxPerBucket: number) => {
-    if (picked.length >= count || pickedIds.has(artist.id)) return;
-    const bucket = assignBucket(artist) ?? '_unknown';
-    if ((bucketCounts.get(bucket) ?? 0) < maxPerBucket) {
-      bucketCounts.set(bucket, (bucketCounts.get(bucket) ?? 0) + 1);
-      const lane = BUCKETS.find(b => b.key === bucket)?.label ?? '';
-      picked.push({ ...artist, lane });
-      pickedIds.add(artist.id);
-    }
-  };
-
-  for (const artist of pool) tryAdd(artist, 1);   // first pass: max 1 per genre bucket
-  for (const artist of pool) tryAdd(artist, 2);   // second pass: allow 2 per bucket
-  for (const artist of pool) tryAdd(artist, 999); // final: fill remainder
-
-  return picked;
-}
-
-function buildQuestions(artists: SpotifyArtist[]): Question[] {
-  const laneOptions = pickDiverseArtists(artists, 8);
-  const laneIds = new Set(laneOptions.map(a => a.id));
-  const skipOptions = pickDiverseArtists(artists, 5, laneIds);
+  const skipOptions: Option[] = skipArtists.map(name => ({
+    label: name,
+    emoji: '⏭️',
+    value: `custom:${name}`,
+  }));
 
   return [
     {
       id: 'current_vibe',
-      prompt: "Pick a drink.",
+      prompt: 'Pick a drink.',
       options: [
         { label: 'Whatever the cool kids drink', sublabel: "I'm at a party, ive got the aux, let's dance", emoji: '🫧', value: 'ready_to_disco' },
         { label: 'Just water', sublabel: 'just on autopilot idrc', emoji: '💧', value: 'on_autopilot' },
@@ -100,19 +77,14 @@ function buildQuestions(artists: SpotifyArtist[]): Question[] {
     },
     {
       id: 'artist_lane',
-      prompt: "Hmm. Interesting choice. which artist are you feeling rn?",
+      prompt: 'Hmm. Interesting choice. which artist are you feeling rn?',
       subtitle: 'go with your gut',
-      options: laneOptions.map(a => ({
-        label: a.name,
-        sublabel: a.lane,
-        emoji: '🎵',
-        value: a.id,
-      })),
+      options: laneOptions,
     },
     {
       id: 'artist_aspect',
-      prompt: '',   // resolved at render time
-      options: [],  // resolved at render time
+      prompt: 'LOL same. what about your artist is matching ur vibe?',
+      options: ARTIST_ASPECT_OPTIONS,
     },
     {
       id: 'artist_why',
@@ -120,24 +92,29 @@ function buildQuestions(artists: SpotifyArtist[]): Question[] {
       options: [
         { label: 'Show them immediately', sublabel: 'no hesitation, good taste is meant to be shared', emoji: '📲', value: 'show_them' },
         { label: 'Hard to explain tbh', sublabel: "you'd have to really know me", emoji: '🤔', value: 'hard_to_explain' },
-        { label: "I'd probably lie", sublabel: 'the real playlist stays private', emoji: '🫣', value: 'would_lie' },
         { label: "I already made them a playlist", sublabel: 'been waiting for someone to ask', emoji: '🎁', value: 'made_them_playlist' },
+        { label: "I'm a gatekeeper ngl", sublabel: 'the real playlist stays private', emoji: '🫣', value: 'would_lie' },
       ],
     },
     {
+      id: 'genre_vibe',
+      prompt: 'Well thats considerate. Which of these sounds most like your vibe right now?',
+      options: genreOptions,
+    },
+    {
       id: 'era',
-      prompt: "What era would you go to if you could go back in time?",
+      prompt: 'What best describes your music personality?',
       options: [
-        { label: 'Timeless', sublabel: 'pre-90s, classic, vintage', emoji: '🎸', value: 'classic' },
-        { label: 'Throwback', sublabel: '90s and 2000s', emoji: '📼', value: 'throwback' },
-        { label: 'Recent', sublabel: '2010s', emoji: '📱', value: 'recent' },
-        { label: 'Right now', sublabel: 'current and fresh', emoji: '🔥', value: 'now' },
-        { label: 'Idc, pick for me', sublabel: 'whatever feels right', emoji: '🎲', value: 'surprise' },
+        { label: 'Timeless', sublabel: 'an old soul', emoji: '🎸', value: 'classic' },
+        { label: 'Pop music enjoyer', sublabel: 'we loved this in middle school', emoji: '📼', value: 'throwback' },
+        { label: 'Whats popping currently', sublabel: 'my artists sell out stadiums', emoji: '📱', value: 'recent' },
+        { label: 'next up', sublabel: 'im scouring the depths of spotify looking for new artists', emoji: '🔥', value: 'discovery' },
+        { label: 'Idc man i just want a playlist', sublabel: 'nice try fbi trying to steal my info', emoji: '🎲', value: 'surprise' },
       ],
     },
     {
       id: 'listening_scenario',
-      prompt: "Lol honestly same. btw What sounds better right now?",
+      prompt: 'Lol honestly same. btw What sounds better right now?',
       options: [
         { label: 'Play the hits', sublabel: 'songs I know every word to', emoji: '🎤', value: 'singalong' },
         { label: 'Mix it up', sublabel: 'some familiar, some Ive never heard', emoji: '🎵', value: 'popular' },
@@ -145,84 +122,16 @@ function buildQuestions(artists: SpotifyArtist[]): Question[] {
       ],
     },
     {
-      id: 'skip_artist',
-      prompt: "K cool. Who would you most likely skip right now?",
-      subtitle: 'even if you love them normally',
-      options: [
-        ...skipOptions.map(a => ({ label: a.name, sublabel: a.lane, emoji: '⏭️', value: a.id })),
-        { label: 'Lolll no way I love them', sublabel: "Nice try but I would never skip them", emoji: '🎵', value: 'none' },
-
-      ].slice(0, 6),
-    },
-    {
       id: 'vocals',
-      prompt: 'Get outta here you love them! R U feeling Vocals or no vocals?',
+      prompt: 'R U feeling Vocals or no vocals?',
       options: [
         { label: 'Give me lyrics', sublabel: 'words matter right now', emoji: '🎤', value: 'vocals' },
         { label: 'Instrumental only', sublabel: 'no words, just sound', emoji: '🎹', value: 'instrumental' },
         { label: 'Either works', sublabel: "I'm not fussed", emoji: '🎵', value: 'either' },
       ],
     },
-
-  ].filter(q => q.id === 'artist_aspect' || q.options.length > 0);
+  ];
 }
-
-// ─── Artist aspect mapping ────────────────────────────────────────────────────
-
-const ASPECT_MAP: { keywords: string[]; label: string; sublabel: string }[] = [
-  { keywords: ['psychedel', 'psych'], label: 'The psychedelic side', sublabel: 'hazy, trippy, mind-bending' },
-  { keywords: ['dub', 'reggae'], label: 'The dub / bass side', sublabel: 'deep, spacious, bass-heavy' },
-  { keywords: ['garage', 'trash', 'noise'], label: 'The raw energy', sublabel: 'rough, unfiltered, lo-fi' },
-  { keywords: ['ambient', 'drone', 'atmospheric'], label: 'The atmospheric side', sublabel: 'spacious, immersive, textural' },
-  { keywords: ['lo-fi', 'bedroom', 'chillwave'], label: 'The bedroom sound', sublabel: 'intimate, home-recorded, fuzzy' },
-  { keywords: ['folk', 'acoustic', 'singer-songwriter'], label: 'The intimate side', sublabel: 'quiet, personal, acoustic' },
-  { keywords: ['electronic', 'synth', 'kraut', 'experimental'], label: 'The experimental side', sublabel: 'textural, electronic, weird' },
-  { keywords: ['hip hop', 'hip-hop', 'rap', 'trap', 'drill'], label: 'The hip-hop side', sublabel: 'beats, rhymes, flow' },
-  { keywords: ['r&b', 'soul', 'neo soul'], label: 'The soulful side', sublabel: 'smooth, emotive, rich' },
-  { keywords: ['dance', 'house', 'techno', 'edm'], label: 'The dance floor side', sublabel: 'driving, rhythmic, euphoric' },
-  { keywords: ['pop'], label: 'The catchy hooks', sublabel: 'melodic, earworm moments' },
-  { keywords: ['indie'], label: 'The indie edge', sublabel: 'off-center, eclectic' },
-  { keywords: ['rock', 'punk', 'post-punk', 'alternative', 'metal', 'hardcore'], label: 'The guitar energy', sublabel: 'driven, electric, edgy' },
-  { keywords: ['jazz', 'blues'], label: 'The jazzy side', sublabel: 'improvisational, soulful' },
-  { keywords: ['country', 'americana'], label: 'The americana side', sublabel: 'roots, stories, heartland' },
-];
-
-function buildAspectOptions(artist: SpotifyArtist): Option[] {
-  const options: Option[] = [];
-
-  for (const aspect of ASPECT_MAP) {
-    if (options.length >= 3) break;
-    if (artist.genres.some(g => aspect.keywords.some(kw => g.toLowerCase().includes(kw)))) {
-      options.push({
-        label: aspect.label,
-        sublabel: aspect.sublabel,
-        emoji: '✨',
-        value: `aspect:${aspect.label}`,
-      });
-    }
-  }
-
-  // Fallback if genres are too niche to match — keep the question always useful
-  if (options.length === 0) {
-    options.push(
-      { label: 'The sound / genre', sublabel: 'the musical style and aesthetic', emoji: '🎵', value: 'aspect:genre' },
-      { label: 'The mood / energy', sublabel: 'how it makes me feel', emoji: '⚡', value: 'aspect:energy' },
-    );
-  }
-
-  options.push({ label: 'The whole vibe', sublabel: 'all of it, honestly', emoji: '🎶', value: 'aspect:all' });
-  return options;
-}
-
-const BUZZFEED_OPTIONS: Option[] = [
-  { label: 'You cry at music', sublabel: 'a good song just hits different', emoji: '😭', value: 'aspect:emotional' },
-  { label: 'You curate everything', sublabel: 'vibes must be just right', emoji: '🎯', value: 'aspect:curator' },
-  { label: "You don't skip", sublabel: 'you let the whole thing play out', emoji: '🔁', value: 'aspect:immersive' },
-  { label: 'You find gems first', sublabel: 'you heard it before it was cool', emoji: '💎', value: 'aspect:discoverer' },
-];
-
-// ─── Analysis log ─────────────────────────────────────────────────────────────
-
 
 // ─── Disco progress bar ───────────────────────────────────────────────────────
 
@@ -332,9 +241,10 @@ function QuizOption({ option, optionIndex, isSelected, isLocked, onPress }: Opti
 interface CustomAnswerInputProps {
   onSubmit: (value: string) => void;
   isLocked: boolean;
+  writeInLabel?: string;
 }
 
-function CustomAnswerInput({ onSubmit, isLocked }: CustomAnswerInputProps) {
+function CustomAnswerInput({ onSubmit, isLocked, writeInLabel = '✏️  Something else...' }: CustomAnswerInputProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [text, setText] = useState('');
 
@@ -357,7 +267,7 @@ function CustomAnswerInput({ onSubmit, isLocked }: CustomAnswerInputProps) {
         )}
       >
         <View className="flex-1">
-          <ThemedText variant="headline" tone="muted">✏️  Something else...</ThemedText>
+          <ThemedText variant="headline" tone="muted">{writeInLabel}</ThemedText>
         </View>
       </Pressable>
     );
@@ -419,10 +329,11 @@ interface QuestionContentProps {
   pendingSelection: string | null;
   resolvedPrompt: string;
   resolvedSubtitle: string | null;
+  writeInLabel?: string;
   onSelect: (value: string) => void;
 }
 
-function QuestionContent({ question, direction, pendingSelection, resolvedPrompt, resolvedSubtitle, onSelect }: QuestionContentProps) {
+function QuestionContent({ question, direction, pendingSelection, resolvedPrompt, resolvedSubtitle, writeInLabel, onSelect }: QuestionContentProps) {
   const { width: SCREEN_W } = useWindowDimensions();
   const slideX = useSharedValue(direction * SCREEN_W);
 
@@ -459,6 +370,7 @@ function QuestionContent({ question, direction, pendingSelection, resolvedPrompt
           key={question.id}
           onSubmit={onSelect}
           isLocked={pendingSelection !== null}
+          writeInLabel={writeInLabel}
         />
       </View>
     </Animated.View>
@@ -467,19 +379,52 @@ function QuestionContent({ question, direction, pendingSelection, resolvedPrompt
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+async function fetchArtistGenres(artistName: string): Promise<GenreData> {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{
+        role: 'user',
+        content: `Artist name (may be misspelled): "${artistName}"\n\nFix any spelling mistakes and return 4 genre tags for this artist.\nReturn JSON: { "correctedName": "Exact Artist Name", "genres": ["genre1", "genre2", "genre3", "genre4"] }\nGenres must be short lowercase labels like "indie rock", "hip-hop", "dream pop", "r&b". Max 3 words each.`,
+      }],
+      response_format: { type: 'json_object' },
+      max_tokens: 80,
+      temperature: 0.2,
+    }),
+  });
+  const data = await res.json();
+  const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}') as Partial<GenreData>;
+  if (!parsed.correctedName || !Array.isArray(parsed.genres) || parsed.genres.length === 0) {
+    throw new Error('invalid genre response');
+  }
+  return { correctedName: parsed.correctedName, genres: parsed.genres.slice(0, 4) };
+}
+
 export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   const { tokens } = useTheme();
-  const { data: topData } = useSpotifyTopData();
+  const { favoriteArtists, skipArtists, isLoaded, addFavorite, addSkip, removeFavorite } = useArtistPreferences();
   const analytics = useAnalytics();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [genreData, setGenreData] = useState<GenreData | null>(null);
   const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const genreOptions = useMemo<Option[]>(
+    () => (genreData?.genres ?? []).map(g => ({
+      label: g,
+      emoji: '🎵',
+      value: `genre:${g}`,
+    })),
+    [genreData],
+  );
+
   const questions = useMemo(
-    () => (topData ? buildQuestions(topData.artists) : []),
-    [topData],
+    () => (isLoaded ? buildQuestions(favoriteArtists, skipArtists, genreOptions) : []),
+    [isLoaded, favoriteArtists, skipArtists, genreOptions],
   );
 
   const question = questions[currentIndex];
@@ -496,9 +441,37 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, []);
 
+  // Auto-skip genre question if genres didn't arrive in time
+  const isAtEmptyGenreQuestion = question?.id === 'genre_vibe' && question.options.length === 0 && pendingSelection === null;
+  useEffect(() => {
+    if (!isAtEmptyGenreQuestion) return;
+    setSlideDirection(1);
+    setCurrentIndex(i => i + 1);
+  }, [isAtEmptyGenreQuestion]);
+
   const handleSelect = useCallback(
     (value: string) => {
       if (!question || pendingSelection) return;
+
+      // Persist new artists and trigger background genre fetch
+      if (question.id === 'artist_lane' && value.startsWith('custom:')) {
+        const rawName = value.slice(7);
+        addFavorite(rawName);
+        setGenreData(null);
+        fetchArtistGenres(rawName).then(result => {
+          setGenreData(result);
+          // Patch answers with corrected spelling
+          setAnswers(prev => ({ ...prev, artist_lane: `custom:${result.correctedName}` }));
+          // Update stored preference if name was corrected
+          if (result.correctedName.toLowerCase() !== rawName.toLowerCase()) {
+            removeFavorite(rawName);
+            addFavorite(result.correctedName);
+          }
+        }).catch(() => { /* fail silently — genre question auto-skips */ });
+      }
+      if (question.id === 'skip_artist' && value.startsWith('custom:')) {
+        addSkip(value.slice(7));
+      }
 
       const nextAnswers = { ...answers, [question.id]: value };
       setAnswers(nextAnswers);
@@ -516,10 +489,10 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
         }
 
         analytics.quizCompleted(nextAnswers);
-        navigation.navigate('Personality', { answers: nextAnswers });
+        navigation.navigate('Results', { answers: nextAnswers });
       }, ADVANCE_AFTER_SELECT_MS);
     },
-    [analytics, answers, currentIndex, navigation, pendingSelection, question, questions],
+    [analytics, answers, currentIndex, navigation, pendingSelection, question, questions, addFavorite, addSkip, removeFavorite],
   );
 
   const handleBack = useCallback(() => {
@@ -531,47 +504,26 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   }, [currentIndex, pendingSelection]);
 
   const chosenArtistName = useMemo(() => {
-    if (!answers.artist_lane) return null;
-    if (answers.artist_lane.startsWith('custom:')) return answers.artist_lane.slice(7);
-    return topData?.artists.find(a => a.id === answers.artist_lane)?.name ?? null;
-  }, [answers.artist_lane, topData]);
+    if (!answers.artist_lane?.startsWith('custom:')) return null;
+    return answers.artist_lane.slice(7);
+  }, [answers.artist_lane]);
 
-  const resolvedAspectQuestion = useMemo(() => {
-    const artistId = answers.artist_lane && !answers.artist_lane.startsWith('custom:')
-      ? answers.artist_lane
-      : null;
-    const artist = artistId ? topData?.artists.find(a => a.id === artistId) : null;
-    if (artist) {
-      return {
-        prompt: `What part of ${artist.name} is speaking to you right now?`,
-        options: buildAspectOptions(artist),
-      };
+  const resolvedPrompt = useMemo(() => {
+    if (question?.id === 'vocals' && answers.skip_artist === 'none') {
+      return 'LOL fair enough. Vocals or no vocals?';
     }
-    return {
-      prompt: 'Real talk. Which one is you?',
-      options: BUZZFEED_OPTIONS,
-    };
-  }, [answers.artist_lane, topData]);
-
-  const activeQuestion = useMemo(() => {
-    if (!question || question.id !== 'artist_aspect') return question;
-    return { ...question, options: resolvedAspectQuestion.options };
-  }, [question, resolvedAspectQuestion]);
+    if (question?.id === 'artist_aspect' && chosenArtistName) {
+      return `LOL same. what about ${chosenArtistName} is matching ur vibe?`;
+    }
+    return question?.prompt ?? '';
+  }, [question, answers.skip_artist, chosenArtistName]);
 
   const resolvedSubtitle = useMemo(() => {
     if (question?.id === 'artist_why') return chosenArtistName;
     return question?.subtitle ?? null;
   }, [question, chosenArtistName]);
 
-  const resolvedPrompt = useMemo(() => {
-    if (question?.id === 'artist_aspect') return resolvedAspectQuestion.prompt;
-    if (question?.id === 'vocals' && answers.skip_artist === 'none') {
-      return 'LOL fair enough. Vocals or no vocals?';
-    }
-    return question?.prompt ?? '';
-  }, [question, answers.skip_artist, resolvedAspectQuestion]);
-
-  if (!question) {
+  if (!isLoaded || !question) {
     return (
       <StarryScreen className="flex-1">
         <SafeAreaView className="flex-1 items-center justify-center gap-4">
@@ -585,7 +537,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
     <StarryScreen className="flex-1">
       <SafeAreaView className="flex-1">
         <KeyboardAvoidingView
-          style={{ flex: 1, }}
+          style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
@@ -614,11 +566,12 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
               <View style={{ overflow: 'hidden' }}>
                 <QuestionContent
                   key={question.id}
-                  question={activeQuestion ?? question}
+                  question={question}
                   direction={slideDirection}
                   pendingSelection={pendingSelection}
                   resolvedPrompt={resolvedPrompt}
                   resolvedSubtitle={resolvedSubtitle}
+                  writeInLabel={question.id === 'artist_lane' ? '✏️  Type an artist...' : undefined}
                   onSelect={handleSelect}
                 />
               </View>

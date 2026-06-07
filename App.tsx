@@ -22,7 +22,7 @@ import '@src/nativewindInterop';
 import { queryClient } from '@src/api/client/queryClient';
 import { RootNavigator } from '@src/navigation/RootNavigator';
 import { ThemeProvider, useTheme } from '@src/state/theme/ThemeProvider';
-import { SpotifyAuthProvider } from '@src/state/spotify/SpotifyAuthProvider';
+import { ArtistPreferencesProvider } from '@src/state/artistPreferences/ArtistPreferencesProvider';
 SplashScreen.preventAutoHideAsync();
 
 function AppShell() {
@@ -32,10 +32,10 @@ function AppShell() {
     <SafeAreaProvider>
       <NavigationContainer>
         <PostHogProvider apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? ''} options={{ host: 'https://us.i.posthog.com', captureScreens: false, debug: __DEV__ }}>
-          <SpotifyAuthProvider>
+          <ArtistPreferencesProvider>
             <RootNavigator />
             <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
-          </SpotifyAuthProvider>
+          </ArtistPreferencesProvider>
         </PostHogProvider>
       </NavigationContainer>
     </SafeAreaProvider>

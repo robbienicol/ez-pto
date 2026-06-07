@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useSpotifyAuth } from '@src/state/spotify/SpotifyAuthProvider';
-import { useSpotifyTopData, type TopData } from './useSpotifyTopData';
+import { useArtistPreferences } from '@src/state/artistPreferences/ArtistPreferencesProvider';
 
 const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
+const SERPER_KEY = process.env.EXPO_PUBLIC_SERPER_API_KEY ?? '';
 
 // ─── Answer label maps ────────────────────────────────────────────────────────
 
@@ -15,12 +15,12 @@ const VIBE: Record<string, string> = {
   winding_down: 'calm and winding down',
 };
 
-// Energy constraints injected into the has-artist prompt to prevent mismatched results
 const VIBE_ENERGY: Record<string, string> = {
   ready_to_disco: 'high energy, party or social setting — the playlist MUST feel upbeat and energetic, nothing slow or sad',
   road_soda: 'car/driving context — needs to work as a driving playlist, good forward momentum',
   winding_down: 'slow and calm is exactly right here',
 };
+
 const MAINSTREAM: Record<string, string> = {
   hits: 'popular chart hits',
   popular: 'well-known but not overplayed',
@@ -30,11 +30,13 @@ const MAINSTREAM: Record<string, string> = {
   nostalgic: 'well-known but not overplayed',
   discovery: 'underground and obscure',
 };
+
 const VOCALS: Record<string, string> = {
   vocals: 'with vocals',
   instrumental: 'instrumental only',
   either: '',
 };
+
 const ERA: Record<string, string> = {
   classic:   'pre-1990s, vintage, classic era',
   throwback: '1990s and 2000s',
@@ -45,64 +47,41 @@ const ERA: Record<string, string> = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface SpotifyPlaylistResult {
+export interface PlaylistResult {
   id: string;
   name: string;
   description: string;
-  external_urls: { spotify: string };
-  images: { url: string; height: number | null; width: number | null }[];
-  tracks: { total: number } | null;
-  owner: { display_name: string; id: string };
+  spotifyUrl: string;
+  thumbnailUrl: string | null;
 }
 
 export interface PlaylistSearchResult {
   searchQuery: string;
-  playlists: SpotifyPlaylistResult[];
-}
-
-// ─── Spotify — related artists ────────────────────────────────────────────────
-
-interface RelatedArtist {
-  name: string;
-  genres: string[];
-}
-
-async function fetchRelatedArtists(artistId: string, accessToken: string): Promise<RelatedArtist[]> {
-  const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}/related-artists`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return ((data.artists ?? []) as RelatedArtist[]).slice(0, 4).map(a => ({
-    name: a.name,
-    genres: a.genres ?? [],
-  }));
+  playlists: PlaylistResult[];
 }
 
 // ─── OpenAI — generate search query ──────────────────────────────────────────
 
 async function buildSearchQuery(
   answers: Record<string, string>,
-  topData: TopData,
-  relatedArtists: RelatedArtist[],
+  favoriteArtists: string[],
+  skipArtists: string[],
 ): Promise<string> {
-  const isCustomArtist = answers.artist_lane?.startsWith('custom:');
-  const chosenArtist = isCustomArtist
-    ? null
-    : topData.artists.find(a => a.id === answers.artist_lane);
-  const artistName = chosenArtist?.name ?? (isCustomArtist ? answers.artist_lane.slice(7) : null);
-  const artistGenres = chosenArtist?.genres ?? [];
-  const hasArtist = !!artistName;
-
-  const relatedNames = relatedArtists.map(a => a.name);
-  const relatedGenres = [...new Set(relatedArtists.flatMap(a => a.genres))].slice(0, 6);
-  const genreCluster = [...new Set([...artistGenres, ...relatedGenres])].slice(0, 6);
-
-  const aspect = !isCustomArtist && answers.artist_aspect?.startsWith('aspect:') && answers.artist_aspect !== 'aspect:all'
-    ? answers.artist_aspect.slice(7)
+  const artistName = answers.artist_lane?.startsWith('custom:')
+    ? answers.artist_lane.slice(7)
     : null;
 
+  const hasArtist = !!artistName;
+  const selectedGenre = answers.genre_vibe?.startsWith('genre:') ? answers.genre_vibe.slice(6) : null;
   const eraText = answers.era ? ERA[answers.era] ?? answers.era : null;
+  const skipClause = skipArtists.length > 0
+    ? `Do NOT generate a query that would surface playlists primarily focused on: ${skipArtists.join(', ')}`
+    : null;
+
+  const aspect =
+    answers.artist_aspect?.startsWith('aspect:') && answers.artist_aspect !== 'aspect:all'
+      ? answers.artist_aspect.slice(7)
+      : null;
 
   let prompt: string;
 
@@ -113,11 +92,14 @@ async function buildSearchQuery(
       `Think: what would a human curator write as the name or description of a playlist that includes ${artistName}?`,
       ``,
       `Artist: ${artistName}`,
-      genreCluster.length > 0 ? `Genre cluster: ${genreCluster.join(', ')}` : null,
-      relatedNames.length > 0 ? `Similar artists: ${relatedNames.join(', ')}` : null,
+      favoriteArtists.length > 1
+        ? `Listener also likes: ${favoriteArtists.filter(a => a !== artistName).slice(0, 3).join(', ')}`
+        : null,
+      selectedGenre ? `Confirmed genre the listener wants right now: ${selectedGenre} — reflect this in the query` : null,
       aspect ? `The listener specifically connects with: ${aspect} — weight this heavily in the query` : null,
       eraText ? `Era: ${eraText}` : null,
       VIBE_ENERGY[answers.current_vibe] ? `Energy constraint: ${VIBE_ENERGY[answers.current_vibe]}` : null,
+      skipClause,
       ``,
       `Return JSON: { "query": "your search query here" }`,
       `The query must sound like a real playlist title a human curator would write.`,
@@ -137,6 +119,8 @@ async function buildSearchQuery(
       `Popularity: ${MAINSTREAM[answers.listening_scenario] ?? answers.listening_scenario}`,
       answers.vocals !== 'either' ? `Vocals: ${VOCALS[answers.vocals] ?? ''}` : null,
       eraText ? `Era: ${eraText}` : null,
+      favoriteArtists.length > 0 ? `Listener likes: ${favoriteArtists.slice(0, 3).join(', ')}` : null,
+      skipClause,
       ``,
       `Return JSON: { "query": "your search query here" }`,
       `Examples: "90s country classics", "late night jazz instrumental", "soft indie acoustic rainy day"`,
@@ -164,218 +148,151 @@ async function buildSearchQuery(
   const data = await res.json();
   const text: string = data.choices?.[0]?.message?.content ?? '{}';
   const parsed = JSON.parse(text) as { query?: string };
-  return parsed.query ?? 'chill playlist';
+  return parsed.query ?? 'feel good indie playlist';
 }
 
-// ─── Spotify — search for playlists ──────────────────────────────────────────
+// ─── Serper — web search for Spotify playlists ────────────────────────────────
 
-type RawPlaylist = {
-  id: string;
-  name: string;
-  description: string;
-  external_urls: { spotify: string };
-  images: { url: string; height: number | null; width: number | null }[];
-  tracks: { total: number } | null;
-  owner: { display_name: string; id: string };
-};
-
-function isSpotifyOwned(owner: { display_name?: string; id: string }): boolean {
-  const id = owner.id.toLowerCase();
-  const name = (owner.display_name ?? '').toLowerCase();
-  return id.includes('spotify') || name.includes('spotify');
+interface SerperOrganic {
+  link: string;
+  title: string;
+  snippet?: string;
 }
 
-// Spotify search caps at 10 per call — fetch two pages in parallel to get 20
-async function fetchPlaylistPage(q: string, offset: number, accessToken: string): Promise<Array<RawPlaylist | null>> {
-  const res = await fetch(
-    `https://api.spotify.com/v1/search?q=${q}&type=playlist&limit=10&offset=${offset}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
+async function searchWebForPlaylists(query: string): Promise<{ id: string; name: string; description: string; spotifyUrl: string }[]> {
+  const res = await fetch('https://google.serper.dev/search', {
+    method: 'POST',
+    headers: { 'X-API-KEY': SERPER_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q: `site:open.spotify.com/playlist ${query}`, num: 10 }),
+  });
+
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Spotify search failed (${res.status}): ${body.slice(0, 200)}`);
+    console.warn(`[playlist] Serper search failed (${res.status})`);
+    return [];
   }
+
   const data = await res.json();
-  return (data.playlists?.items ?? []) as Array<RawPlaylist | null>;
+  const seen = new Set<string>();
+
+  return ((data.organic ?? []) as SerperOrganic[])
+    .map(r => {
+      const id = r.link.match(/playlist\/([A-Za-z0-9]+)/)?.[1];
+      if (!id || seen.has(id)) return null;
+      seen.add(id);
+      const name = r.title.split(' • ')[0]?.trim() ?? r.title;
+      return {
+        id,
+        name,
+        description: r.snippet ?? '',
+        spotifyUrl: `https://open.spotify.com/playlist/${id}`,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 }
 
-const MAX_SAVES = 4000;
+// ─── Spotify oembed — fetch thumbnail ────────────────────────────────────────
 
-async function fetchFollowerCount(playlistId: string, accessToken: string): Promise<number> {
-  const res = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}?fields=followers`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
-  if (!res.ok) return Infinity;
-  const data = await res.json();
-  return (data.followers?.total as number | undefined) ?? Infinity;
+async function fetchThumbnail(playlistId: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/${playlistId}`,
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.thumbnail_url as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
 }
 
-type RawPlaylistWithFollowers = RawPlaylist & { followerCount: number };
+// ─── Scenario-based selection (using search rank as popularity proxy) ─────────
 
-// Map listening_scenario to a fractional start position within the result pool.
-// obscure gets the bottom of the list, hits the top, others scale linearly between.
-function pickByScenario(playlists: RawPlaylistWithFollowers[], scenario: string): RawPlaylistWithFollowers[] {
-  const m = playlists.length;
+function pickByScenario(
+  candidates: { id: string; name: string; description: string; spotifyUrl: string }[],
+  scenario: string,
+): typeof candidates {
+  const m = candidates.length;
   if (m === 0) return [];
 
-  if (scenario === 'obscure' || scenario === 'discovery') {
-    return [...playlists].slice(Math.max(0, m - 3)).reverse();
+  if (scenario === 'obscure' || scenario === 'discovery' || scenario === 'deep_cuts') {
+    return candidates.slice(Math.max(0, m - 3)).reverse();
   }
 
   const startFraction: Record<string, number> = {
-    hits:      0,
-    singalong: 0,
-    popular:   0.25,
-    nostalgic: 0.25,
+    hits: 0, singalong: 0,
+    popular: 0.25, nostalgic: 0.25,
   };
   const frac = startFraction[scenario] ?? 0;
   const startIdx = Math.min(Math.floor(m * frac), Math.max(0, m - 3));
-  return playlists.slice(startIdx, startIdx + 3);
+  return candidates.slice(startIdx, startIdx + 3);
 }
 
-async function searchSpotifyPlaylists(
-  query: string,
-  accessToken: string,
-  scenario: string,
-): Promise<SpotifyPlaylistResult[]> {
-  const q = encodeURIComponent(query);
+// ─── Main pipeline ────────────────────────────────────────────────────────────
 
-  const [page1, page2] = await Promise.all([
-    fetchPlaylistPage(q, 0, accessToken),
-    fetchPlaylistPage(q, 10, accessToken),
-  ]);
+async function findPlaylists(
+  answers: Record<string, string>,
+  favoriteArtists: string[],
+  skipArtists: string[],
+): Promise<PlaylistSearchResult> {
+  const searchQuery = await buildSearchQuery(answers, favoriteArtists, skipArtists);
+  console.log('[playlist] query:', searchQuery);
 
-  const seenNames = new Set<string>();
+  const raw = await searchWebForPlaylists(searchQuery);
+  const picked = pickByScenario(raw, answers.listening_scenario ?? 'hits').slice(0, 3);
 
-  const candidates = [...page1, ...page2]
-    .filter((item): item is RawPlaylist => item !== null)
-    .filter(item => !isSpotifyOwned(item.owner))
-    .filter(item => {
-      const key = item.name.toLowerCase().trim();
-      if (seenNames.has(key)) return false;
-      seenNames.add(key);
-      return true;
-    });
+  const thumbnails = await Promise.all(picked.map(p => fetchThumbnail(p.id)));
 
-  const followerCounts = await Promise.all(
-    candidates.map(p => fetchFollowerCount(p.id, accessToken)),
-  );
-
-  const withFollowers: RawPlaylistWithFollowers[] = candidates.map((p, i) => ({
+  const playlists: PlaylistResult[] = picked.map((p, i) => ({
     ...p,
-    followerCount: followerCounts[i]!,
+    thumbnailUrl: thumbnails[i] ?? null,
   }));
 
-  // Keep only hidden gems; if none qualify, fall back to the least-saved ones
-  const gems = withFollowers.filter(p => p.followerCount < MAX_SAVES);
-  const pool = gems.length > 0
-    ? gems
-    : [...withFollowers].sort((a, b) => a.followerCount - b.followerCount).slice(0, 5);
-
-  return pickByScenario(pool, scenario).map(item => ({
-    id: item.id,
-    name: item.name,
-    description: item.description ?? '',
-    external_urls: item.external_urls,
-    images: item.images,
-    tracks: item.tracks,
-    owner: item.owner,
-  }));
+  return { searchQuery, playlists };
 }
 
-// ─── Demo mode mock playlists ─────────────────────────────────────────────────
+// ─── Demo mode ────────────────────────────────────────────────────────────────
 
-const DEMO_PLAYLIST_RESULT: PlaylistSearchResult = {
+const DEMO_RESULT: PlaylistSearchResult = {
   searchQuery: 'indie electronic dream pop',
   playlists: [
     {
       id: 'demo_p1',
       name: 'late night frequencies',
       description: 'electronic and indie for the hours when everything slows down',
-      external_urls: { spotify: 'https://open.spotify.com/genre/indie-page' },
-      images: [],
-      tracks: { total: 42 },
-      owner: { display_name: 'indiecurator', id: 'indiecurator' },
+      spotifyUrl: 'https://open.spotify.com/genre/indie-page',
+      thumbnailUrl: null,
     },
     {
       id: 'demo_p2',
       name: 'bedroom pop essentials',
       description: 'intimate, lo-fi, and just a little hazy',
-      external_urls: { spotify: 'https://open.spotify.com/genre/lofi-page' },
-      images: [],
-      tracks: { total: 38 },
-      owner: { display_name: 'vibesonly', id: 'vibesonly' },
+      spotifyUrl: 'https://open.spotify.com/genre/lofi-page',
+      thumbnailUrl: null,
     },
     {
       id: 'demo_p3',
       name: 'underground sounds',
       description: 'hidden gems from the edges of indie and electronic',
-      external_urls: { spotify: 'https://open.spotify.com/genre/electronic-page' },
-      images: [],
-      tracks: { total: 55 },
-      owner: { display_name: 'discoverymode', id: 'discoverymode' },
+      spotifyUrl: 'https://open.spotify.com/genre/electronic-page',
+      thumbnailUrl: null,
     },
   ],
 };
 
-// ─── Main pipeline ────────────────────────────────────────────────────────────
-
-async function findPlaylistsFromVibe(
-  answers: Record<string, string>,
-  topData: TopData,
-  accessToken: string,
-): Promise<PlaylistSearchResult> {
-  const isCustomArtist = answers.artist_lane?.startsWith('custom:');
-  const chosenArtist = isCustomArtist
-    ? null
-    : topData.artists.find(a => a.id === answers.artist_lane);
-
-  const relatedArtists = chosenArtist
-    ? await fetchRelatedArtists(chosenArtist.id, accessToken)
-    : [];
-
-  const searchQuery = await buildSearchQuery(answers, topData, relatedArtists);
-  console.log('[playlist] answers:', JSON.stringify(answers, null, 2));
-  console.log('[playlist] query:', searchQuery);
-  const playlists = await searchSpotifyPlaylists(searchQuery, accessToken, answers.listening_scenario ?? 'hits');
-  return { searchQuery, playlists };
-}
-
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function usePlaylistRecommendation(answers: Record<string, string>) {
-  const { accessToken, ensureValidToken } = useSpotifyAuth();
-  const { data: topData } = useSpotifyTopData();
-
-  const enabled = !!accessToken && !!topData;
+  const { favoriteArtists, skipArtists } = useArtistPreferences();
+  const isDemo = answers._demo === 'true';
 
   return useQuery({
     queryKey: ['playlist-search', answers],
-    queryFn: async () => {
-      if (accessToken === '__demo__') return DEMO_PLAYLIST_RESULT;
-      const freshToken = await ensureValidToken();
-      if (!freshToken) throw new Error('Spotify session expired — please reconnect.');
-      return findPlaylistsFromVibe(answers, topData!, freshToken);
+    queryFn: () => {
+      if (isDemo) return DEMO_RESULT;
+      return findPlaylists(answers, favoriteArtists, skipArtists);
     },
-    enabled,
+    enabled: Object.keys(answers).length > 0,
     staleTime: Infinity,
     retry: 1,
   });
 }
-
-// ─── Clone pipeline (commented out — circle back later) ───────────────────────
-//
-// import { LOGO_COVER_JPEG_B64 } from './logoCoverBase64';
-//
-// async function fetchAllTrackUris(playlistId: string, accessToken: string): Promise<string[]> { ... }
-// async function createNewPlaylist(userId: string, name: string, accessToken: string): Promise<string> { ... }
-// async function addTracksToPlaylist(playlistId: string, uris: string[], accessToken: string): Promise<void> { ... }
-// async function uploadPlaylistCover(playlistId: string, accessToken: string): Promise<void> { ... }
-//
-// Full clone implementation lives in git history. When ready:
-//   1. Restore the clone functions above
-//   2. Change queryKey to ['playlist-clone', answers]
-//   3. Call findAndClonePlaylist(answers, topData!, freshToken, spotifyUserId!)
-//   4. Add spotifyUserId to enabled check and useSpotifyAuth destructure
-//   5. Update ResultsScreen to use ClonedResult instead of PlaylistSearchResult

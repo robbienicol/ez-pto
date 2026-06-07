@@ -7,19 +7,16 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ThemedButton } from '@src/components/atoms/ThemedButton';
 import { ThemedText } from '@src/components/atoms/ThemedText';
 import { StarryScreen } from '@src/components/atoms/StarryScreen';
-import { useSpotifyAuth } from '@src/state/spotify/SpotifyAuthProvider';
-import { usePlaylistRecommendation, type SpotifyPlaylistResult } from '@src/api/hooks/usePlaylistRecommendation';
+import { usePlaylistRecommendation, type PlaylistResult } from '@src/api/hooks/usePlaylistRecommendation';
 import { useAnalytics } from '@src/analytics';
 import type { AppStackParamList } from '@src/navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Results'>;
 
-function PlaylistCard({ playlist }: { playlist: SpotifyPlaylistResult }) {
-  const coverUrl = playlist.images?.[0]?.url;
-
+function PlaylistCard({ playlist }: { playlist: PlaylistResult }) {
   const handleOpen = useCallback(() => {
     Linking.openURL(`spotify://playlist/${playlist.id}`).catch(() => {
-      Linking.openURL(playlist.external_urls.spotify);
+      Linking.openURL(playlist.spotifyUrl);
     });
   }, [playlist]);
 
@@ -30,9 +27,9 @@ function PlaylistCard({ playlist }: { playlist: SpotifyPlaylistResult }) {
       style={{ borderColor: '#FF4DB3' }}
       className="bg-surface dark:bg-surfaceDark border-2 rounded-2xl overflow-hidden active:opacity-70"
     >
-      {coverUrl ? (
+      {playlist.thumbnailUrl ? (
         <Image
-          source={{ uri: coverUrl }}
+          source={{ uri: playlist.thumbnailUrl }}
           style={{ width: '100%', aspectRatio: 1 }}
           contentFit="cover"
         />
@@ -48,7 +45,7 @@ function PlaylistCard({ playlist }: { playlist: SpotifyPlaylistResult }) {
         ) : null}
         <View className="flex-row items-center justify-between mt-1">
           <ThemedText variant="caption" tone="muted">
-            {playlist.tracks?.total != null ? `${playlist.tracks.total} tracks · ` : ''}{playlist.owner.display_name}
+            open in spotify
           </ThemedText>
           <View style={{ backgroundColor: '#FF4DB3' }} className="px-3 py-1 rounded-pill">
             <ThemedText variant="caption" style={{ color: '#fff' }}>Open</ThemedText>
@@ -61,7 +58,6 @@ function PlaylistCard({ playlist }: { playlist: SpotifyPlaylistResult }) {
 
 export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { answers } = route.params;
-  const { disconnect } = useSpotifyAuth();
 
   const { data: result, status, error, refetch } = usePlaylistRecommendation(answers);
   const analytics = useAnalytics();
@@ -79,6 +75,10 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   const goToQuiz = useCallback(() => {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [navigation]);
+
+  const handlePersonality = useCallback(() => {
+    navigation.navigate('Personality', { answers });
+  }, [navigation, answers]);
 
   const handleStartOver = useCallback(() => {
     analytics.retakeClicked();
@@ -104,10 +104,6 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
     setRating(value);
     analytics.playlistRated(value);
   }, [rating, analytics]);
-
-  const handleDisconnect = useCallback(async () => {
-    await disconnect();
-  }, [disconnect]);
 
   if (status === 'pending') {
     return (
@@ -225,8 +221,8 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Actions */}
           <View className="gap-3 mt-2">
-            <ThemedButton label="Start over" variant="primary" onPress={handleStartOver} />
-            <ThemedButton label="Disconnect Spotify" variant="ghost" onPress={handleDisconnect} />
+            <ThemedButton label="wanna see ur personality too? 👀" variant="primary" onPress={handlePersonality} />
+            <ThemedButton label="Start over" variant="ghost" onPress={handleStartOver} />
           </View>
 
           <ThemedText variant="caption" tone="muted" style={{ textAlign: 'center', marginTop: 4 }}>

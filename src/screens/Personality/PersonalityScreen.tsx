@@ -14,8 +14,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { ThemedButton } from '@src/components/atoms/ThemedButton';
 import { usePersonality } from '@src/api/hooks/usePersonality';
-import { usePlaylistRecommendation } from '@src/api/hooks/usePlaylistRecommendation';
-import { useSpotifyTopData } from '@src/api/hooks/useSpotifyTopData';
 import type { AppStackParamList } from '@src/navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Personality'>;
@@ -188,8 +186,6 @@ function PixelChip({ label, color }: { label: string; color: string }) {
 export const PersonalityScreen: React.FC<Props> = ({ navigation, route }) => {
   const { answers } = route.params;
   const { data: personality, status } = usePersonality(answers);
-  usePlaylistRecommendation(answers); // pre-warm cache so Results loads instantly
-  const { data: topData } = useSpotifyTopData();
 
   const [displayedTitle, setDisplayedTitle] = useState('');
   const [typingDone, setTypingDone]         = useState(false);
@@ -249,8 +245,8 @@ export const PersonalityScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
 
   const handleDone = useCallback(() => {
-    navigation.replace('Results', { answers });
-  }, [navigation, answers]);
+    navigation.goBack();
+  }, [navigation]);
 
   const accent      = '#FF4DB3';
   const columnColor = accent + '55';
@@ -283,7 +279,6 @@ export const PersonalityScreen: React.FC<Props> = ({ navigation, route }) => {
 
   if (!personality) return null;
 
-  const topArtist    = topData?.artists[0]?.name;
   const eraLabel     = ERA_SHORT[answers.era];
   const scenarioLabel = SCENARIO_SHORT[answers.listening_scenario];
 
@@ -365,7 +360,7 @@ export const PersonalityScreen: React.FC<Props> = ({ navigation, route }) => {
 
             {/* Stat chips */}
             {/* <Animated.View style={[{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }, chipsAnimStyle]}>
-              {topArtist     ? <PixelChip label={`🎵 ${topArtist}`}      color={accent} /> : null}
+
               {scenarioLabel ? <PixelChip label={`💎 ${scenarioLabel}`}  color={accent} /> : null}
             </Animated.View> */}
 
@@ -382,10 +377,12 @@ export const PersonalityScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Buttons */}
           <View style={{ width: '100%', flexDirection: 'row', gap: 10, marginTop: 6 }}>
             <View style={{ flex: 1 }}>
-              <ThemedButton label="Share" variant="primary" onPress={handleShare} />
+            <ThemedButton label="Back" variant="secondary" onPress={handleDone} />
+
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedButton label="My Playlists" variant="primary-green" onPress={handleDone} />
+            <ThemedButton label="Share" variant="primary" onPress={handleShare} />
+
             </View>
           </View>
 

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useSpotifyTopData, type TopData } from './useSpotifyTopData';
+import { useArtistPreferences } from '@src/state/artistPreferences/ArtistPreferencesProvider';
 
 const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 
@@ -41,20 +41,11 @@ const ARTIST_WHY_LABEL: Record<string, string> = {
 
 async function fetchPersonality(
   answers: Record<string, string>,
-  topData: TopData,
+  favoriteArtists: string[],
 ): Promise<PersonalityResult> {
-  const topArtistNames = topData.artists.slice(0, 5).map(a => a.name).join(', ');
-  const topTrackNames = topData.tracks
-    .slice(0, 3)
-    .map(t => `${t.name} by ${t.artists[0]?.name ?? 'unknown'}`)
-    .join(', ');
-
-  const isCustomArtist = answers.artist_lane?.startsWith('custom:');
-  const chosenArtist = !isCustomArtist
-    ? topData.artists.find(a => a.id === answers.artist_lane)
+  const artistName = answers.artist_lane?.startsWith('custom:')
+    ? answers.artist_lane.slice(7)
     : null;
-  const artistName =
-    chosenArtist?.name ?? (isCustomArtist ? answers.artist_lane.slice(7) : null);
 
   const aspect =
     answers.artist_aspect?.startsWith('aspect:') && answers.artist_aspect !== 'aspect:all'
@@ -62,7 +53,7 @@ async function fetchPersonality(
       : null;
 
   const prompt = [
-    'Create a music personality archetype for this Spotify user based on their quiz and listening history.',
+    'Create a music personality archetype for this user based on their quiz answers and music taste.',
     '',
     'Quiz answers:',
     `- Context: ${VIBE_LABEL[answers.current_vibe] ?? answers.current_vibe ?? 'unknown'}`,
@@ -74,13 +65,14 @@ async function fetchPersonality(
       ? `- Music sharing personality: ${ARTIST_WHY_LABEL[answers.artist_why]}`
       : null,
     '',
-    `Top Spotify artists: ${topArtistNames}`,
-    `Recently played tracks: ${topTrackNames}`,
+    favoriteArtists.length > 0
+      ? `Favorite artists: ${favoriteArtists.slice(0, 5).join(', ')}`
+      : null,
     '',
     'Return JSON with exactly these fields:',
     '{',
     '  "title": "3-5 word archetype name in ALL CAPS — dramatic, identity-level, can start with THE",',
-    '  "subtitle": "one punchy sentence that feels personal — reference their actual artist or genre cluster, make them feel seen",',
+    '  "subtitle": "one punchy sentence that feels personal — reference their actual artist or genre, make them feel seen",',
     '  "emoji": "single most fitting emoji for this archetype",',
     '  "color": "one of: pink, purple, blue, gold, green"',
     '}',
@@ -121,12 +113,12 @@ async function fetchPersonality(
 }
 
 export function usePersonality(answers: Record<string, string>) {
-  const { data: topData } = useSpotifyTopData();
-  const enabled = !!topData && Object.keys(answers).length > 0;
+  const { favoriteArtists } = useArtistPreferences();
+  const enabled = Object.keys(answers).length > 0;
 
   return useQuery({
     queryKey: ['personality', answers],
-    queryFn: () => fetchPersonality(answers, topData!),
+    queryFn: () => fetchPersonality(answers, favoriteArtists),
     enabled,
     staleTime: Infinity,
     retry: 1,
