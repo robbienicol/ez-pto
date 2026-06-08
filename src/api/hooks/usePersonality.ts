@@ -7,7 +7,6 @@ const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 export interface PersonalityResult {
   title: string;
   subtitle: string;
-  emoji: string;
   color: 'pink' | 'purple' | 'blue' | 'gold' | 'green';
 }
 
@@ -73,7 +72,6 @@ async function fetchPersonality(
     '{',
     '  "title": "3-5 word archetype name in ALL CAPS — dramatic, identity-level, can start with THE",',
     '  "subtitle": "one punchy sentence that feels personal — reference their actual artist or genre, make them feel seen",',
-    '  "emoji": "single most fitting emoji for this archetype",',
     '  "color": "one of: pink, purple, blue, gold, green"',
     '}',
     '',
@@ -105,7 +103,6 @@ async function fetchPersonality(
   return {
     title: parsed.title ?? 'THE VIBE CURATOR',
     subtitle: parsed.subtitle ?? 'Your taste speaks for itself.',
-    emoji: parsed.emoji ?? '🎵',
     color: validColors.includes(parsed.color as PersonalityResult['color'])
       ? (parsed.color as PersonalityResult['color'])
       : 'purple',

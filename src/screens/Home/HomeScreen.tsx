@@ -118,7 +118,7 @@ function DiscoBall() {
 
 // ─── Feature chip ─────────────────────────────────────────────────────────────
 
-function FeatureChip({ emoji, label, color, index }: { emoji: string; label: string; color: string; index: number }) {
+function FeatureChip({ label, color, index }: { label: string; color: string; index: number }) {
   const scale = useSharedValue(0.8);
 
   useEffect(() => {
@@ -129,15 +129,14 @@ function FeatureChip({ emoji, label, color, index }: { emoji: string; label: str
 
   return (
     <Animated.View style={style} className={`flex-row items-center gap-2 px-4 py-2.5 rounded-pill ${color} border`}>
-      <Text style={{ fontSize: 18 }}>{emoji}</Text>
       <ThemedText variant="caption" className="font-nunito-extrabold">{label}</ThemedText>
     </Animated.View>
   );
 }
 
 const VALUE_PROPS = [
-  { emoji: '🔓', label: 'No sign-up', color: 'bg-laserGreen/15 border-laserGreen/30' },
-  { emoji: '🆓', label: 'Always free', color: 'bg-neonPurple/15 border-neonPurple/30' },
+  { label: 'No sign-up', color: 'bg-laserGreen/15 border-laserGreen/30' },
+  { label: 'Always free', color: 'bg-neonPurple/15 border-neonPurple/30' },
 ];
 
 const SPIRAL_MS = 560;
@@ -274,7 +273,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 className="gap-3 mt-8"
               >
                 <ThemedButton
-                  label="Let's go 🎧"
+                  label="Let's go"
                   variant="primary"
                   showSelectionCursor
                   onPress={handlePress}

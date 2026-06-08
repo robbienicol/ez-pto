@@ -88,7 +88,7 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleShare = useCallback(async () => {
     analytics.shareClicked();
     await Share.share({
-      message: "Hey! Try this free app — it asks you a few questions about your vibe and finds you the perfect Spotify playlist 🎵 Takes 30 seconds.",
+      message: "Hey! Try this free app — it asks you a few questions about your vibe and finds you the perfect Spotify playlist. Takes 30 seconds.",
     });
     setShowShareModal(false);
     goToQuiz();
@@ -159,8 +159,7 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Header */}
           <View className="gap-1">
             <ThemedText variant="caption" tone="muted">your vibe, your playlist</ThemedText>
-            <ThemedText variant="display">Ready Set Disco 🪩</ThemedText>
-       
+            <ThemedText variant="display">Ready Set Disco</ThemedText>
           </View>
 
           {/* Playlist cards */}
@@ -221,7 +220,7 @@ export const ResultsScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Actions */}
           <View className="gap-3 mt-2">
-            <ThemedButton label="wanna see ur personality too? 👀" variant="primary" onPress={handlePersonality} />
+            <ThemedButton label="wanna see ur personality too?" variant="primary" onPress={handlePersonality} />
             <ThemedButton label="Start over" variant="ghost" onPress={handleStartOver} />
           </View>
 

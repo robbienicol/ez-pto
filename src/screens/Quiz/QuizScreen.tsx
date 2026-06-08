@@ -31,7 +31,6 @@ type Props = NativeStackScreenProps<AppStackParamList, 'Quiz'>;
 interface Option {
   label: string;
   sublabel?: string;
-  emoji: string;
   value: string;
 }
 
@@ -45,40 +44,37 @@ interface Question {
 // ─── Static question options ──────────────────────────────────────────────────
 
 const ARTIST_ASPECT_OPTIONS: Option[] = [
-  { label: 'the genre', sublabel: 'sounds like nothing else', emoji: '🎶', value: 'aspect:genre' },
-  { label: 'the tempo', sublabel: 'it just hits at the right speed', emoji: '⚡', value: 'aspect:tempo' },
-  { label: "its what the cool kids are listening to", sublabel: 'i have taste, obviously', emoji: '😎', value: 'aspect:cool' },
-  { label: "why are you asking so many questions? am i under arrest?", sublabel: '', emoji: '🚔', value: 'aspect:arrested' },
+  { label: 'the genre', value: 'aspect:genre' },
+  { label: 'the tempo', value: 'aspect:tempo' },
+  { label: 'it puts me on autopilot', sublabel: '', value: 'aspect:inthezone' },
+  { label: 'why are you asking so many questions? am i under arrest?', sublabel: '', value: 'aspect:arrested' },
 ];
 
 function buildQuestions(favoriteArtists: string[], skipArtists: string[], genreOptions: Option[]): Question[] {
   const laneOptions: Option[] = favoriteArtists.map(name => ({
     label: name,
-    emoji: '🎵',
     value: `custom:${name}`,
   }));
 
   const skipOptions: Option[] = skipArtists.map(name => ({
     label: name,
-    emoji: '⏭️',
     value: `custom:${name}`,
   }));
 
   return [
     {
       id: 'current_vibe',
-      prompt: 'Pick a drink.',
+      prompt: 'pick a drink.',
       options: [
-        { label: 'Whatever the cool kids drink', sublabel: "I'm at a party, ive got the aux, let's dance", emoji: '🫧', value: 'ready_to_disco' },
-        { label: 'Just water', sublabel: 'just on autopilot idrc', emoji: '💧', value: 'on_autopilot' },
-        { label: 'Hot tea', sublabel: 'winding down, slow it down', emoji: '🍵', value: 'winding_down' },
-        { label: 'Road soda', sublabel: "I'm in the car, windows optional", emoji: '🚗', value: 'road_soda' },
+        { label: 'whatever the cool kids drink', sublabel: "i'm at a party, ive got the aux, let's dance", value: 'ready_to_disco' },
+        { label: 'just water', sublabel: 'just on autopilot idrc', value: 'on_autopilot' },
+        { label: 'hot tea', sublabel: 'winding down, slow it down', value: 'winding_down' },
+        { label: 'road soda', sublabel: "i'm in the car, windows optional", value: 'road_soda' },
       ],
     },
     {
       id: 'artist_lane',
-      prompt: 'Hmm. Interesting choice. which artist are you feeling rn?',
-      subtitle: 'go with your gut',
+      prompt: 'anyways which artist are you feeling rn?',
       options: laneOptions,
     },
     {
@@ -87,47 +83,47 @@ function buildQuestions(favoriteArtists: string[], skipArtists: string[], genreO
       options: ARTIST_ASPECT_OPTIONS,
     },
     {
-      id: 'artist_why',
-      prompt: "Someone asks what you're listening to. You:",
-      options: [
-        { label: 'Show them immediately', sublabel: 'no hesitation, good taste is meant to be shared', emoji: '📲', value: 'show_them' },
-        { label: 'Hard to explain tbh', sublabel: "you'd have to really know me", emoji: '🤔', value: 'hard_to_explain' },
-        { label: "I already made them a playlist", sublabel: 'been waiting for someone to ask', emoji: '🎁', value: 'made_them_playlist' },
-        { label: "I'm a gatekeeper ngl", sublabel: 'the real playlist stays private', emoji: '🫣', value: 'would_lie' },
-      ],
-    },
-    {
       id: 'genre_vibe',
-      prompt: 'Well thats considerate. Which of these sounds most like your vibe right now?',
+      prompt: 'which genre are we specifically vibing with?',
       options: genreOptions,
     },
     {
-      id: 'era',
-      prompt: 'What best describes your music personality?',
+      id: 'artist_why',
+      prompt: "if someone tries to shazam a song you're playing, you:",
       options: [
-        { label: 'Timeless', sublabel: 'an old soul', emoji: '🎸', value: 'classic' },
-        { label: 'Pop music enjoyer', sublabel: 'we loved this in middle school', emoji: '📼', value: 'throwback' },
-        { label: 'Whats popping currently', sublabel: 'my artists sell out stadiums', emoji: '📱', value: 'recent' },
-        { label: 'next up', sublabel: 'im scouring the depths of spotify looking for new artists', emoji: '🔥', value: 'discovery' },
-        { label: 'Idc man i just want a playlist', sublabel: 'nice try fbi trying to steal my info', emoji: '🎲', value: 'surprise' },
+        { label: "tell them the song immediately, i'm not a hater", value: 'show_them' },
+        { label: 'i send them the whole playlist', value: 'made_them_playlist' },
+        { label: "i'm a gatekeeper ngl, im throwing their phone out the window", value: 'would_lie' },
+      ],
+    },
+ 
+    {
+      id: 'era',
+      prompt: 'if you could own ur favorite album in any format, it would be:',
+      options: [
+        { label: 'give me it on vinyl', value: 'classic' },
+        { label: 'im cool with a CD/cassette', value: 'throwback' },
+        { label: 'i\'m cool with just having it on my phone',  value: 'recent' },
+        { label: 'can i get it implanted into my brain or something?', sublabel: 'im scouring the depths of spotify looking for new artists', value: 'discovery' },
+        { label: 'idc man i just want a playlist', sublabel: 'nice try fbi trying to steal my info', value: 'surprise' },
       ],
     },
     {
       id: 'listening_scenario',
-      prompt: 'Lol honestly same. btw What sounds better right now?',
+      prompt: 'last question. what sounds better right now?',
       options: [
-        { label: 'Play the hits', sublabel: 'songs I know every word to', emoji: '🎤', value: 'singalong' },
-        { label: 'Mix it up', sublabel: 'some familiar, some Ive never heard', emoji: '🎵', value: 'popular' },
-        { label: 'Surprise me', sublabel: 'deep cuts and hidden gems only', emoji: '💎', value: 'deep_cuts' },
+        { label: 'play the hits', sublabel: 'songs i know every word to', value: 'singalong' },
+        { label: 'mix it up', sublabel: "some familiar, some i've never heard", value: 'popular' },
+        { label: 'surprise me', sublabel: 'deep cuts and hidden gems only', value: 'deep_cuts' },
       ],
     },
     {
       id: 'vocals',
-      prompt: 'R U feeling Vocals or no vocals?',
+      prompt: 'r u feeling vocals or no vocals?',
       options: [
-        { label: 'Give me lyrics', sublabel: 'words matter right now', emoji: '🎤', value: 'vocals' },
-        { label: 'Instrumental only', sublabel: 'no words, just sound', emoji: '🎹', value: 'instrumental' },
-        { label: 'Either works', sublabel: "I'm not fussed", emoji: '🎵', value: 'either' },
+        { label: 'give me lyrics', sublabel: 'words matter right now', value: 'vocals' },
+        { label: 'instrumental only', sublabel: 'no words, just sound', value: 'instrumental' },
+        { label: 'either works', sublabel: "i'm not fussed", value: 'either' },
       ],
     },
   ];
@@ -145,7 +141,80 @@ const SELECTION_ACCENTS = [
   'bg-gold/45 border-gold',
 ] as const;
 
-const ADVANCE_AFTER_SELECT_MS = 0;
+// ─── Trait system ────────────────────────────────────────────────────────────
+
+interface Traits {
+  coolness: number;
+  chaos: number;
+  emotionalDamage: number;
+  danceability: number;
+  gatekeeping: number;
+  discovery: number;
+}
+
+const TRAIT_LABELS: Record<keyof Traits, string> = {
+  coolness: 'coolness',
+  chaos: 'chaos',
+  emotionalDamage: 'emotional damage',
+  danceability: 'danceability',
+  gatekeeping: 'gatekeeping',
+  discovery: 'discovery',
+};
+
+const DEFAULT_TRAITS: Traits = { coolness: 0, chaos: 0, emotionalDamage: 0, danceability: 0, gatekeeping: 0, discovery: 0 };
+
+const ANSWER_TRAITS: Record<string, Partial<Traits>> = {
+  ready_to_disco:     { danceability: 25, coolness: 15, chaos: 10 },
+  on_autopilot:       { emotionalDamage: 10, chaos: 5 },
+  winding_down:       { emotionalDamage: 20, discovery: 5 },
+  road_soda:          { chaos: 20, coolness: 15, danceability: 5 },
+  'aspect:genre':     { discovery: 15, gatekeeping: 10 },
+  'aspect:tempo':     { danceability: 20, coolness: 10 },
+  'aspect:inthezone': { coolness: 15, chaos: 10 },
+  'aspect:arrested':  { chaos: 30, coolness: 20 },
+  show_them:          { coolness: 15, danceability: 10 },
+  made_them_playlist: { emotionalDamage: 10, coolness: 10 },
+  would_lie:          { gatekeeping: 25, coolness: 10 },
+  hard_to_explain:    { emotionalDamage: 15, discovery: 10 },
+  classic:            { gatekeeping: 20, discovery: 10 },
+  throwback:          { emotionalDamage: 20, danceability: 10 },
+  recent:             { danceability: 20, coolness: 10 },
+  discovery:          { discovery: 25, gatekeeping: 15 },
+  surprise:           { chaos: 25, danceability: 10 },
+  singalong:          { danceability: 25, coolness: 10 },
+  popular:            { coolness: 15, discovery: 10 },
+  deep_cuts:          { discovery: 25, gatekeeping: 20 },
+  vocals:             { emotionalDamage: 10, danceability: 15 },
+  instrumental:       { discovery: 15, gatekeeping: 10 },
+  either:             { coolness: 15, danceability: 5 },
+  
+};
+
+const NARRATOR_REACTIONS: Record<string, string> = {
+  ready_to_disco:     "woohoo! ok lets get funky.",
+  on_autopilot:       "sheesh atleast put a lemon in it mr. boring.",
+  winding_down:       "snoozer.",
+  road_soda:          "excellent. i'll take a mr.pibb if you dont mind.",
+  'aspect:arrested':  "LMAO licence & registration please? jkjk.",
+  show_them:          "that's actually very kind of you.",
+  made_them_playlist: "what a sweetheart you are.",
+  would_lie:          "hey we've all been there.",
+  classic:            "really? i'll make sure to not pass you the aux any time soon. anyways",
+  throwback:          "really? i'll make sure to not pass you the aux any time soon. anyways",
+  recent:             "really? i'll make sure to not pass you the aux any time soon. anyways",
+  discovery:          "this is the only right answer. anyways",
+  surprise:           "LOL okok",
+  singalong:          "noted. ok actual last question:",
+  popular:            "noted. ok actual last question:",
+  deep_cuts:          "noted. ok actual last question:",
+  vocals:             "words. feelings. the whole situation.",
+  instrumental:       "letting the piano do the crying.",
+  either:             "flexible. dangerous.",
+};
+
+const CHECKPOINT_AFTER = new Set([2, 5]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface OptionPressableProps {
   option: Option;
@@ -244,7 +313,7 @@ interface CustomAnswerInputProps {
   writeInLabel?: string;
 }
 
-function CustomAnswerInput({ onSubmit, isLocked, writeInLabel = '✏️  Something else...' }: CustomAnswerInputProps) {
+function CustomAnswerInput({ onSubmit, isLocked, writeInLabel = 'something else...' }: CustomAnswerInputProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [text, setText] = useState('');
 
@@ -366,14 +435,43 @@ function QuestionContent({ question, direction, pendingSelection, resolvedPrompt
             onPress={onSelect}
           />
         ))}
-        <CustomAnswerInput
-          key={question.id}
-          onSubmit={onSelect}
-          isLocked={pendingSelection !== null}
-          writeInLabel={writeInLabel}
-        />
+        {writeInLabel !== undefined && (
+          <CustomAnswerInput
+            key={question.id}
+            onSubmit={onSelect}
+            isLocked={pendingSelection !== null}
+            writeInLabel={writeInLabel}
+          />
+        )}
       </View>
     </Animated.View>
+  );
+}
+
+// ─── Narrator ────────────────────────────────────────────────────────────────
+
+function TraitRow({ label, value }: { label: string; value: number }) {
+  const pct = Math.min(100, value);
+  const barWidth = useSharedValue(0);
+
+  useEffect(() => {
+    barWidth.value = withTiming(pct, { duration: 700 });
+  }, [pct, barWidth]);
+
+  const barStyle = useAnimatedStyle(() => ({ width: `${barWidth.value}%` as `${number}%` }));
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <RNText style={{ width: 140, fontFamily: 'VT323_400Regular', fontSize: 16, color: 'rgba(255,255,255,0.45)' }}>
+        {label}
+      </RNText>
+      <View style={{ flex: 1, height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+        <Animated.View style={[{ height: 3, backgroundColor: '#FF4DB3', borderRadius: 2 }, barStyle]} />
+      </View>
+      <RNText style={{ width: 38, textAlign: 'right', fontFamily: 'VT323_400Regular', fontSize: 16, color: 'rgba(255,255,255,0.45)' }}>
+        {pct}%
+      </RNText>
+    </View>
   );
 }
 
@@ -411,21 +509,24 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [genreData, setGenreData] = useState<GenreData | null>(null);
-  const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [traits, setTraits] = useState<Traits>(DEFAULT_TRAITS);
+  const [lastReaction, setLastReaction] = useState<string | null>(null);
+  const pendingAnswersRef = useRef<Record<string, string>>({});
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const genreOptions = useMemo<Option[]>(
-    () => (genreData?.genres ?? []).map(g => ({
-      label: g,
-      emoji: '🎵',
-      value: `genre:${g}`,
-    })),
+    () => (genreData?.genres ?? []).map(g => ({ label: g, value: `genre:${g}` })),
     [genreData],
   );
 
-  const questions = useMemo(
-    () => (isLoaded ? buildQuestions(favoriteArtists, skipArtists, genreOptions) : []),
-    [isLoaded, favoriteArtists, skipArtists, genreOptions],
-  );
+  const questions = useMemo(() => {
+    if (!isLoaded) return [];
+    const all = buildQuestions(favoriteArtists, skipArtists, genreOptions);
+    if (answers.artist_aspect && answers.artist_aspect !== 'aspect:genre') {
+      return all.filter(q => q.id !== 'genre_vibe');
+    }
+    return all;
+  }, [isLoaded, favoriteArtists, skipArtists, genreOptions, answers.artist_aspect]);
 
   const question = questions[currentIndex];
 
@@ -435,12 +536,6 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
     }, [analytics]),
   );
 
-  useEffect(() => {
-    return () => {
-      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
-    };
-  }, []);
-
   // Auto-skip genre question if genres didn't arrive in time
   const isAtEmptyGenreQuestion = question?.id === 'genre_vibe' && question.options.length === 0 && pendingSelection === null;
   useEffect(() => {
@@ -449,55 +544,72 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
     setCurrentIndex(i => i + 1);
   }, [isAtEmptyGenreQuestion]);
 
+  useEffect(() => {
+    return () => { if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current); };
+  }, []);
+
   const handleSelect = useCallback(
     (value: string) => {
       if (!question || pendingSelection) return;
 
-      // Persist new artists and trigger background genre fetch
       if (question.id === 'artist_lane' && value.startsWith('custom:')) {
         const rawName = value.slice(7);
         addFavorite(rawName);
         setGenreData(null);
         fetchArtistGenres(rawName).then(result => {
           setGenreData(result);
-          // Patch answers with corrected spelling
           setAnswers(prev => ({ ...prev, artist_lane: `custom:${result.correctedName}` }));
-          // Update stored preference if name was corrected
           if (result.correctedName.toLowerCase() !== rawName.toLowerCase()) {
             removeFavorite(rawName);
             addFavorite(result.correctedName);
           }
-        }).catch(() => { /* fail silently — genre question auto-skips */ });
+        }).catch(() => {});
       }
       if (question.id === 'skip_artist' && value.startsWith('custom:')) {
         addSkip(value.slice(7));
       }
 
       const nextAnswers = { ...answers, [question.id]: value };
+      pendingAnswersRef.current = nextAnswers;
       setAnswers(nextAnswers);
       setPendingSelection(value);
 
-      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
-      advanceTimeoutRef.current = setTimeout(() => {
-        advanceTimeoutRef.current = null;
+      const delta = ANSWER_TRAITS[value];
+      const nextTraits: Traits = delta ? {
+        coolness:        traits.coolness        + (delta.coolness        ?? 0),
+        chaos:           traits.chaos           + (delta.chaos           ?? 0),
+        emotionalDamage: traits.emotionalDamage + (delta.emotionalDamage ?? 0),
+        danceability:    traits.danceability    + (delta.danceability    ?? 0),
+        gatekeeping:     traits.gatekeeping     + (delta.gatekeeping     ?? 0),
+        discovery:       traits.discovery       + (delta.discovery       ?? 0),
+      } : traits;
+      if (delta) setTraits(nextTraits);
+
+      const reactionText = NARRATOR_REACTIONS[value]
+        
+
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = setTimeout(() => {
+        advanceTimerRef.current = null;
         setPendingSelection(null);
+        setLastReaction(reactionText);
 
         if (currentIndex < questions.length - 1) {
           setSlideDirection(1);
           setCurrentIndex(i => i + 1);
-          return;
+        } else {
+          analytics.quizCompleted(pendingAnswersRef.current);
+          navigation.navigate('Results', { answers: pendingAnswersRef.current });
         }
-
-        analytics.quizCompleted(nextAnswers);
-        navigation.navigate('Results', { answers: nextAnswers });
-      }, ADVANCE_AFTER_SELECT_MS);
+      }, 250);
     },
-    [analytics, answers, currentIndex, navigation, pendingSelection, question, questions, addFavorite, addSkip, removeFavorite],
+    [analytics, answers, currentIndex, navigation, pendingSelection, question, questions.length, traits, addFavorite, addSkip, removeFavorite],
   );
 
   const handleBack = useCallback(() => {
     if (pendingSelection) return;
     if (currentIndex > 0) {
+      setLastReaction(null);
       setSlideDirection(-1);
       setCurrentIndex(i => i - 1);
     }
@@ -510,16 +622,18 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
 
   const resolvedPrompt = useMemo(() => {
     if (question?.id === 'vocals' && answers.skip_artist === 'none') {
-      return 'LOL fair enough. Vocals or no vocals?';
+      return 'LOL fair enough. vocals or no vocals?';
     }
     if (question?.id === 'artist_aspect' && chosenArtistName) {
       return `LOL same. what about ${chosenArtistName} is matching ur vibe?`;
     }
+    if (question?.id === 'artist_why' && answers.artist_aspect === 'aspect:arrested') {
+      return "if someone asks what you're listening to. you:";
+    }
     return question?.prompt ?? '';
-  }, [question, answers.skip_artist, chosenArtistName]);
+  }, [question, answers.skip_artist, answers.artist_aspect, chosenArtistName]);
 
   const resolvedSubtitle = useMemo(() => {
-    if (question?.id === 'artist_why') return chosenArtistName;
     return question?.subtitle ?? null;
   }, [question, chosenArtistName]);
 
@@ -558,9 +672,6 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
                   <View style={{ width: 24 }} />
                 )}
                 <DiscoProgressBar current={currentIndex} total={questions.length} />
-                <ThemedText variant="caption" tone="muted" style={{ minWidth: 36, textAlign: 'right' }}>
-                  {currentIndex + 1}/{questions.length}
-                </ThemedText>
               </View>
 
               <View style={{ overflow: 'hidden' }}>
@@ -569,9 +680,9 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
                   question={question}
                   direction={slideDirection}
                   pendingSelection={pendingSelection}
-                  resolvedPrompt={resolvedPrompt}
+                  resolvedPrompt={lastReaction ? `${lastReaction} ${resolvedPrompt}` : resolvedPrompt}
                   resolvedSubtitle={resolvedSubtitle}
-                  writeInLabel={question.id === 'artist_lane' ? '✏️  Type an artist...' : undefined}
+                  writeInLabel={question.id === 'artist_lane' ? 'type an artist...' : undefined}
                   onSelect={handleSelect}
                 />
               </View>

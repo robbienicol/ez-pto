@@ -187,7 +187,74 @@ async function searchWebForPlaylists(query: string): Promise<{ id: string; name:
         spotifyUrl: `https://open.spotify.com/playlist/${id}`,
       };
     })
-    .filter((x): x is NonNullable<typeof x> => x !== null);
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .filter(x => {
+      const text = `${x.name} ${x.description}`.toLowerCase();
+      return !/(podcast|episode|interview|show notes|hosted by|host:|listen now|guest:|chapter \d)/i.test(text);
+    });
+}
+
+// ─── Music blog search — artist discovery ────────────────────────────────────
+
+const BLOG_SITE_QUERY =
+  'site:gorillavsbear.net OR site:stereogum.com OR site:thefader.com OR site:tinymixtapes.com OR site:pitchfork.com OR site:numerogroup.com OR site:aquariusrecords.org';
+
+async function searchBlogForArtist(
+  answers: Record<string, string>,
+  favoriteArtists: string[],
+): Promise<string | null> {
+  try {
+    const artist = answers.artist_lane?.startsWith('custom:') ? answers.artist_lane.slice(7) : null;
+    const genre = answers.genre_vibe?.startsWith('genre:') ? answers.genre_vibe.slice(6) : null;
+    const eraText = answers.era ? ERA[answers.era] ?? null : null;
+
+    const focus = artist ?? genre ?? favoriteArtists[0] ?? null;
+    if (!focus) return null;
+
+    const q = [focus, eraText, 'recommendation'].filter(Boolean).join(' ');
+
+    const res = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: { 'X-API-KEY': SERPER_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: `${q} ${BLOG_SITE_QUERY}`, num: 5 }),
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const organic = (data.organic ?? []) as SerperOrganic[];
+    if (organic.length === 0) return null;
+
+    const context = organic
+      .map(r => `${r.title}: ${r.snippet ?? ''}`)
+      .join('\n')
+      .slice(0, 1200);
+
+    const known = [focus, ...favoriteArtists].filter(Boolean).join(', ');
+
+    const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: `Music blog snippets for someone who likes ${focus}:\n\n${context}\n\nExtract ONE specific underrated or emerging artist name that would be a great discovery for this listener. Do not suggest: ${known}.\nReturn JSON: { "artist": "Artist Name" } or { "artist": null } if nothing fits.`,
+        }],
+        response_format: { type: 'json_object' },
+        max_tokens: 60,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!gptRes.ok) return null;
+
+    const gptData = await gptRes.json();
+    const parsed = JSON.parse(gptData.choices?.[0]?.message?.content ?? '{}') as { artist?: string | null };
+    return parsed.artist ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Spotify oembed — fetch thumbnail ────────────────────────────────────────
@@ -237,8 +304,37 @@ async function findPlaylists(
   const searchQuery = await buildSearchQuery(answers, favoriteArtists, skipArtists);
   console.log('[playlist] query:', searchQuery);
 
-  const raw = await searchWebForPlaylists(searchQuery);
-  const picked = pickByScenario(raw, answers.listening_scenario ?? 'hits').slice(0, 3);
+  const isDiscoveryMode =
+    answers.listening_scenario === 'popular' || answers.listening_scenario === 'deep_cuts';
+
+  let picked: { id: string; name: string; description: string; spotifyUrl: string }[];
+
+  let resolvedBlogArtist: string | null = null;
+
+  if (isDiscoveryMode) {
+    const [raw, blogArtist] = await Promise.all([
+      searchWebForPlaylists(searchQuery),
+      searchBlogForArtist(answers, favoriteArtists),
+    ]);
+
+    resolvedBlogArtist = blogArtist;
+    console.log('[playlist] blog artist:', blogArtist);
+
+    const standardCount = blogArtist ? 2 : 3;
+    const standard = pickByScenario(raw, answers.listening_scenario).slice(0, standardCount);
+
+    let blogPick: typeof raw = [];
+    if (blogArtist) {
+      const eraText = answers.era ? ERA[answers.era] ?? '' : '';
+      const blogRaw = await searchWebForPlaylists(`${blogArtist} ${eraText}`.trim());
+      blogPick = blogRaw.slice(0, 1);
+    }
+
+    picked = [...standard, ...blogPick].slice(0, 3);
+  } else {
+    const raw = await searchWebForPlaylists(searchQuery);
+    picked = pickByScenario(raw, answers.listening_scenario ?? 'hits').slice(0, 3);
+  }
 
   const thumbnails = await Promise.all(picked.map(p => fetchThumbnail(p.id)));
 
