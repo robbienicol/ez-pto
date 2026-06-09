@@ -85,6 +85,8 @@ async function buildSearchQuery(
 
   let prompt: string;
 
+  const inferredGenre = !selectedGenre ? (answers.inferred_genre ?? null) : null;
+
   if (hasArtist) {
     prompt = [
       `Generate a 3-6 word Spotify playlist search query to find playlists where ${artistName} would be curated alongside similar artists.`,
@@ -95,7 +97,11 @@ async function buildSearchQuery(
       favoriteArtists.length > 1
         ? `Listener also likes: ${favoriteArtists.filter(a => a !== artistName).slice(0, 3).join(', ')}`
         : null,
-      selectedGenre ? `Confirmed genre the listener wants right now: ${selectedGenre} — reflect this in the query` : null,
+      selectedGenre
+        ? `Confirmed genre the listener wants right now: ${selectedGenre} — reflect this in the query`
+        : inferredGenre
+          ? `Artist's primary genre: ${inferredGenre} — anchor the query to this genre`
+          : null,
       aspect ? `The listener specifically connects with: ${aspect} — weight this heavily in the query` : null,
       eraText ? `Era: ${eraText}` : null,
       VIBE_ENERGY[answers.current_vibe] ? `Energy constraint: ${VIBE_ENERGY[answers.current_vibe]}` : null,
@@ -257,6 +263,60 @@ async function searchBlogForArtist(
   }
 }
 
+// ─── Obsessed mode — find a playlist that definitely has the artist ───────────
+
+async function searchBlogPlaylistForArtist(
+  artistName: string,
+): Promise<{ id: string; name: string; description: string; spotifyUrl: string } | null> {
+  try {
+    // First: search music blogs for articles that embed a Spotify playlist for this artist
+    const blogRes = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: { 'X-API-KEY': SERPER_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: `"${artistName}" spotify playlist ${BLOG_SITE_QUERY}`, num: 10 }),
+    });
+
+    if (blogRes.ok) {
+      const blogData = await blogRes.json();
+      for (const r of (blogData.organic ?? []) as SerperOrganic[]) {
+        const combined = `${r.link} ${r.snippet ?? ''}`;
+        const match = combined.match(/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)/);
+        if (match) {
+          return {
+            id: match[1],
+            name: r.title.split(' • ')[0]?.trim() ?? r.title,
+            description: r.snippet ?? '',
+            spotifyUrl: `https://open.spotify.com/playlist/${match[1]}`,
+          };
+        }
+      }
+    }
+
+    // Fallback: Spotify playlists whose title/description directly mentions the artist
+    const spotifyRes = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: { 'X-API-KEY': SERPER_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: `site:open.spotify.com/playlist "${artistName}"`, num: 5 }),
+    });
+
+    if (!spotifyRes.ok) return null;
+    const first = ((await spotifyRes.json()).organic ?? [])[0] as SerperOrganic | undefined;
+    if (!first) return null;
+
+    const id = first.link.match(/playlist\/([A-Za-z0-9]+)/)?.[1];
+    if (!id) return null;
+
+    return {
+      id,
+      name: first.title.split(' • ')[0]?.trim() ?? first.title,
+      description: first.snippet ?? '',
+      spotifyUrl: `https://open.spotify.com/playlist/${id}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Spotify oembed — fetch thumbnail ────────────────────────────────────────
 
 async function fetchThumbnail(playlistId: string): Promise<string | null> {
@@ -307,21 +367,28 @@ async function findPlaylists(
   const isDiscoveryMode =
     answers.listening_scenario === 'popular' || answers.listening_scenario === 'deep_cuts';
 
+  const hasChosenArtist = !!answers.artist_lane?.startsWith('custom:');
+  const isObsessedAspect = answers.artist_aspect === 'aspect:obsessed';
+  const isEraObsessed = answers.era === 'discovery';
+  const shouldRunBlogArtist = (hasChosenArtist || isEraObsessed) && !isObsessedAspect;
+
   let picked: { id: string; name: string; description: string; spotifyUrl: string }[];
 
-  let resolvedBlogArtist: string | null = null;
+  const raw = await searchWebForPlaylists(searchQuery);
 
-  if (isDiscoveryMode) {
-    const [raw, blogArtist] = await Promise.all([
-      searchWebForPlaylists(searchQuery),
-      searchBlogForArtist(answers, favoriteArtists),
-    ]);
+  if (isObsessedAspect && hasChosenArtist) {
+    const artistName = answers.artist_lane!.slice(7);
+    const blogPlaylist = await searchBlogPlaylistForArtist(artistName);
+    console.log('[playlist] obsessed blog playlist:', blogPlaylist?.name ?? null);
 
-    resolvedBlogArtist = blogArtist;
+    const standard = raw.slice(0, blogPlaylist ? 2 : 3);
+    picked = blogPlaylist ? [...standard, blogPlaylist].slice(0, 3) : standard;
+  } else if (shouldRunBlogArtist) {
+    const blogArtist = await searchBlogForArtist(answers, favoriteArtists);
     console.log('[playlist] blog artist:', blogArtist);
 
     const standardCount = blogArtist ? 2 : 3;
-    const standard = pickByScenario(raw, answers.listening_scenario).slice(0, standardCount);
+    const standard = pickByScenario(raw, answers.listening_scenario ?? 'hits').slice(0, standardCount);
 
     let blogPick: typeof raw = [];
     if (blogArtist) {
@@ -332,8 +399,7 @@ async function findPlaylists(
 
     picked = [...standard, ...blogPick].slice(0, 3);
   } else {
-    const raw = await searchWebForPlaylists(searchQuery);
-    picked = pickByScenario(raw, answers.listening_scenario ?? 'hits').slice(0, 3);
+    picked = pickByScenario(raw, isDiscoveryMode ? answers.listening_scenario : (answers.listening_scenario ?? 'hits')).slice(0, 3);
   }
 
   const thumbnails = await Promise.all(picked.map(p => fetchThumbnail(p.id)));

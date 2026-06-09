@@ -251,7 +251,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         }}
                       >
                         {'Answer '}
-                        <Text style={{ color: '#FFD700' }}>8 questions</Text>
+                        <Text style={{ color: '#FFD700' }}>a couple questions</Text>
                         {'.\nGet a personalized spotify playlist.'}
                       </Text>
                     </View>

@@ -47,6 +47,7 @@ const ARTIST_ASPECT_OPTIONS: Option[] = [
   { label: 'the genre', value: 'aspect:genre' },
   { label: 'the tempo', value: 'aspect:tempo' },
   { label: 'it puts me on autopilot', sublabel: '', value: 'aspect:inthezone' },
+  { label: 'im just obsessed rn', sublabel: '', value: 'aspect:obsessed' },
   { label: 'why are you asking so many questions? am i under arrest?', sublabel: '', value: 'aspect:arrested' },
 ];
 
@@ -171,6 +172,7 @@ const ANSWER_TRAITS: Record<string, Partial<Traits>> = {
   'aspect:genre':     { discovery: 15, gatekeeping: 10 },
   'aspect:tempo':     { danceability: 20, coolness: 10 },
   'aspect:inthezone': { coolness: 15, chaos: 10 },
+  'aspect:obsessed':  { discovery: 20, coolness: 15, emotionalDamage: 10 },
   'aspect:arrested':  { chaos: 30, coolness: 20 },
   show_them:          { coolness: 15, danceability: 10 },
   made_them_playlist: { emotionalDamage: 10, coolness: 10 },
@@ -195,6 +197,7 @@ const NARRATOR_REACTIONS: Record<string, string> = {
   on_autopilot:       "sheesh atleast put a lemon in it mr. boring.",
   winding_down:       "snoozer.",
   road_soda:          "excellent. i'll take a mr.pibb if you dont mind.",
+  'aspect:obsessed':  "lol ok stan mode: activated.",
   'aspect:arrested':  "LMAO licence & registration please? jkjk.",
   show_them:          "that's actually very kind of you.",
   made_them_playlist: "what a sweetheart you are.",
@@ -522,10 +525,14 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   const questions = useMemo(() => {
     if (!isLoaded) return [];
     const all = buildQuestions(favoriteArtists, skipArtists, genreOptions);
+    let filtered = all;
     if (answers.artist_aspect && answers.artist_aspect !== 'aspect:genre') {
-      return all.filter(q => q.id !== 'genre_vibe');
+      filtered = filtered.filter(q => q.id !== 'genre_vibe');
     }
-    return all;
+    if (answers.artist_aspect === 'aspect:obsessed') {
+      filtered = filtered.filter(q => q.id !== 'listening_scenario');
+    }
+    return filtered;
   }, [isLoaded, favoriteArtists, skipArtists, genreOptions, answers.artist_aspect]);
 
   const question = questions[currentIndex];
@@ -558,7 +565,11 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
         setGenreData(null);
         fetchArtistGenres(rawName).then(result => {
           setGenreData(result);
-          setAnswers(prev => ({ ...prev, artist_lane: `custom:${result.correctedName}` }));
+          setAnswers(prev => ({
+            ...prev,
+            artist_lane: `custom:${result.correctedName}`,
+            ...(result.genres[0] ? { inferred_genre: result.genres[0] } : {}),
+          }));
           if (result.correctedName.toLowerCase() !== rawName.toLowerCase()) {
             removeFavorite(rawName);
             addFavorite(result.correctedName);
