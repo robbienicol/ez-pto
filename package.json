@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.30",
+    "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/nunito": "^0.4.2",
+    "@expo-google-fonts/outfit": "^0.4.3",
     "@expo-google-fonts/righteous": "^0.4.1",
     "@expo-google-fonts/vt323": "^0.4.1",
     "@react-navigation/bottom-tabs": "^7.15.5",
@@ -32,6 +34,7 @@
     "expo-sharing": "~56.0.15",
     "expo-splash-screen": "~56.0.10",
     "expo-status-bar": "~56.0.4",
+    "expo-store-review": "~56.0.3",
     "expo-web-browser": "~56.0.5",
     "graphql": "^16.13.1",
     "graphql-request": "^7.4.0",

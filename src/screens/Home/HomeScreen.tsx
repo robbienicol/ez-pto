@@ -134,10 +134,7 @@ function FeatureChip({ label, color, index }: { label: string; color: string; in
   );
 }
 
-const VALUE_PROPS = [
-  { label: 'No sign-up', color: 'bg-laserGreen/15 border-laserGreen/30' },
-  { label: 'Always free', color: 'bg-neonPurple/15 border-neonPurple/30' },
-];
+
 
 const SPIRAL_MS = 560;
 
@@ -243,7 +240,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
                     >
                       <Text
                         style={{
-                          fontFamily: 'Righteous_400Regular',
+                          fontFamily: 'Inter_700Bold',
                           fontSize: 22,
                           lineHeight: 32,
                           color: '#FFFFFF',
@@ -251,22 +248,15 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         }}
                       >
                         {'Answer '}
-                        <Text style={{ color: '#FFD700' }}>a couple questions</Text>
-                        {'.\nGet a personalized spotify playlist.'}
+                        <Text style={{ color: '#FFD700' }}>8 questions</Text>
+                        {'.\nDiscover your identity.'}
                       </Text>
                     </View>
                   </View>
                 </Animated.View>
               </View>
 
-              <Animated.View
-                entering={FadeInUp.delay(500).duration(400)}
-                className="flex-row flex-wrap justify-center gap-3 mt-6"
-              >
-                {VALUE_PROPS.map((v, i) => (
-                  <FeatureChip key={v.label} {...v} index={i} />
-                ))}
-              </Animated.View>
+        
 
               <Animated.View
                 entering={FadeInUp.delay(900).duration(500).springify()}

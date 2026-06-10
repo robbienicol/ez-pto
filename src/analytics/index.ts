@@ -26,6 +26,12 @@ export function useAnalytics() {
     spotifyConnected: () =>
       posthog?.capture('spotify_connected'),
 
+    ageSelected: (age: string) =>
+      posthog?.capture('age_selected', { age }),
+
+    genderSelected: (gender: string) =>
+      posthog?.capture('gender_selected', { gender }),
+
     eraSelected: (era: string) =>
       posthog?.capture('era_selected', { era }),
 

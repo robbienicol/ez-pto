@@ -5,44 +5,45 @@ import { useArtistPreferences } from '@src/state/artistPreferences/ArtistPrefere
 const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 const SERPER_KEY = process.env.EXPO_PUBLIC_SERPER_API_KEY ?? '';
 
-// ─── Answer label maps ────────────────────────────────────────────────────────
+// ─── Answer label maps (update these when quiz questions change) ──────────────
 
-const VIBE: Record<string, string> = {
-  ready_to_disco: 'high energy, ready to go',
-  half_asleep: 'low energy, barely functioning',
-  on_autopilot: 'background listening, chill',
-  road_soda: 'driving, on the move',
-  winding_down: 'calm and winding down',
+const AESTHETIC_ENERGY: Record<string, string> = {
+  record_store:    'indie, analog warmth — no high-energy bangers',
+  rooftop_golden:  'elevated and social — needs to feel curated and confident',
+  empty_theater:   'atmospheric and cinematic — nothing too upbeat or obvious',
+  late_night_drive:'nocturnal and moody — forward momentum, slightly dark',
 };
 
-const VIBE_ENERGY: Record<string, string> = {
-  ready_to_disco: 'high energy, party or social setting — the playlist MUST feel upbeat and energetic, nothing slow or sad',
-  road_soda: 'car/driving context — needs to work as a driving playlist, good forward momentum',
-  winding_down: 'slow and calm is exactly right here',
+const MUSIC_ROLE: Record<string, string> = {
+  process_emotions:     'lyric-focused, emotionally resonant',
+  background_listening: 'ambient, unobtrusive, no jarring moments',
+  my_personality:       'identity-driven, genre-conscious, tasteful',
+  discover_worlds:      'exploratory and eclectic',
+  time_machine:         'era-specific nostalgia',
 };
 
-const MAINSTREAM: Record<string, string> = {
-  hits: 'popular chart hits',
-  popular: 'well-known but not overplayed',
-  deep_cuts: 'deep cuts and lesser-known tracks',
-  obscure: 'underground and obscure',
-  singalong: 'popular chart hits',
-  nostalgic: 'well-known but not overplayed',
-  discovery: 'underground and obscure',
+const DISCOVERY_MODE: Record<string, string> = {
+  algorithm:        'popular, well-known, accessible',
+  friend_trust:     'well-curated, quality over quantity',
+  digging:          'deep cuts, obscure, underground',
+  artist_to_artist: 'cohesive sound, similar artists throughout',
+  same_stuff:       'familiar, safe, established favorites',
 };
 
-const VOCALS: Record<string, string> = {
-  vocals: 'with vocals',
-  instrumental: 'instrumental only',
-  either: '',
+const ASPIRATION_TILT: Record<string, string> = {
+  more_creative:    'experimental, art-adjacent, slightly challenging',
+  more_grounded:    'organic, acoustic, rooted',
+  more_adventurous: 'genre-crossing, eclectic',
+  more_disciplined: 'focused, instrumental-friendly, minimal',
+  more_magnetic:    'bold, confident, scene-defining',
 };
 
-const ERA: Record<string, string> = {
-  classic:   'pre-1990s, vintage, classic era',
-  throwback: '1990s and 2000s',
-  recent:    '2010s',
-  now:       'current, 2020s, recent releases',
-  surprise:  'any era — pick whatever best fits the overall vibe',
+const ERA_TEXT: Record<string, string> = {
+  era_70s:   'pre-1990s, vintage, classic era',
+  era_90s:   '1990s — alternative, grunge, hip-hop',
+  era_2000s: '2000s — indie, emo, blog era',
+  era_2010s: '2010s — indie blog era, dream pop',
+  era_now:   'current 2020s releases',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,13 +52,22 @@ export interface PlaylistResult {
   id: string;
   name: string;
   description: string;
-  spotifyUrl: string;
+  url: string;
+  platform: 'spotify' | 'apple' | 'youtube';
   thumbnailUrl: string | null;
 }
 
 export interface PlaylistSearchResult {
   searchQuery: string;
   playlists: PlaylistResult[];
+}
+
+type Platform = 'spotify' | 'apple' | 'youtube';
+
+function resolvePlatform(answers: Record<string, string>): Platform {
+  if (answers.platform === 'platform_apple') return 'apple';
+  if (answers.platform === 'platform_youtube') return 'youtube';
+  return 'spotify';
 }
 
 // ─── OpenAI — generate search query ──────────────────────────────────────────
@@ -71,23 +81,19 @@ async function buildSearchQuery(
     ? answers.artist_lane.slice(7)
     : null;
 
-  const hasArtist = !!artistName;
-  const selectedGenre = answers.genre_vibe?.startsWith('genre:') ? answers.genre_vibe.slice(6) : null;
-  const eraText = answers.era ? ERA[answers.era] ?? answers.era : null;
+  const inferredGenre    = answers.inferred_genre ?? null;
+  const eraText          = answers.era_pull ? ERA_TEXT[answers.era_pull] ?? null : null;
+  const aestheticEnergy  = answers.aesthetic_world ? AESTHETIC_ENERGY[answers.aesthetic_world] ?? null : null;
+  const musicRoleText    = answers.music_role ? MUSIC_ROLE[answers.music_role] ?? null : null;
+  const aspirationText   = answers.aspiration ? ASPIRATION_TILT[answers.aspiration] ?? null : null;
+
   const skipClause = skipArtists.length > 0
     ? `Do NOT generate a query that would surface playlists primarily focused on: ${skipArtists.join(', ')}`
     : null;
 
-  const aspect =
-    answers.artist_aspect?.startsWith('aspect:') && answers.artist_aspect !== 'aspect:all'
-      ? answers.artist_aspect.slice(7)
-      : null;
-
   let prompt: string;
 
-  const inferredGenre = !selectedGenre ? (answers.inferred_genre ?? null) : null;
-
-  if (hasArtist) {
+  if (artistName) {
     prompt = [
       `Generate a 3-6 word Spotify playlist search query to find playlists where ${artistName} would be curated alongside similar artists.`,
       ``,
@@ -97,40 +103,32 @@ async function buildSearchQuery(
       favoriteArtists.length > 1
         ? `Listener also likes: ${favoriteArtists.filter(a => a !== artistName).slice(0, 3).join(', ')}`
         : null,
-      selectedGenre
-        ? `Confirmed genre the listener wants right now: ${selectedGenre} — reflect this in the query`
-        : inferredGenre
-          ? `Artist's primary genre: ${inferredGenre} — anchor the query to this genre`
-          : null,
-      aspect ? `The listener specifically connects with: ${aspect} — weight this heavily in the query` : null,
-      eraText ? `Era: ${eraText}` : null,
-      VIBE_ENERGY[answers.current_vibe] ? `Energy constraint: ${VIBE_ENERGY[answers.current_vibe]}` : null,
+      inferredGenre   ? `Artist's primary genre: ${inferredGenre} — anchor the query to this genre` : null,
+      eraText         ? `Era preference: ${eraText}` : null,
+      aestheticEnergy ? `Energy constraint: ${aestheticEnergy}` : null,
+      aspirationText  ? `Style tilt: ${aspirationText}` : null,
       skipClause,
       ``,
       `Return JSON: { "query": "your search query here" }`,
       `The query must sound like a real playlist title a human curator would write.`,
       `Never use: "chill", "vibes", "relaxing", "good music", "playlist".`,
-      `Examples: "dreamy psych pop gems", "weirdo girl indie", "underground psych garage", "lo-fi bedroom discoveries"`,
       `Keep it 3-6 words.`,
     ].filter(Boolean).join('\n');
   } else {
-    const vibeText = answers.current_vibe?.startsWith('custom:')
-      ? `Their drink choice is "${answers.current_vibe.slice(7)}" — infer the energy and mood this drink implies`
-      : (VIBE[answers.current_vibe] ?? answers.current_vibe);
-
     prompt = [
-      `Generate a concise Spotify playlist search query (3-6 words) based on this listener's vibe.`,
+      `Generate a concise Spotify playlist search query (3-6 words) based on this listener's profile.`,
       ``,
-      `Vibe: ${vibeText}`,
-      `Popularity: ${MAINSTREAM[answers.listening_scenario] ?? answers.listening_scenario}`,
-      answers.vocals !== 'either' ? `Vocals: ${VOCALS[answers.vocals] ?? ''}` : null,
-      eraText ? `Era: ${eraText}` : null,
-      favoriteArtists.length > 0 ? `Listener likes: ${favoriteArtists.slice(0, 3).join(', ')}` : null,
+      aestheticEnergy ? `Aesthetic/energy: ${aestheticEnergy}` : null,
+      musicRoleText   ? `Music relationship: ${musicRoleText}` : null,
+      aspirationText  ? `Style tilt: ${aspirationText}` : null,
+      eraText         ? `Era: ${eraText}` : null,
+      favoriteArtists.length > 0
+        ? `Listener likes: ${favoriteArtists.slice(0, 3).join(', ')}`
+        : null,
       skipClause,
       ``,
       `Return JSON: { "query": "your search query here" }`,
-      `Examples: "90s country classics", "late night jazz instrumental", "soft indie acoustic rainy day"`,
-      `Keep it 3-6 words. Include the era when relevant.`,
+      `Keep it 3-6 words.`,
     ].filter(Boolean).join('\n');
   }
 
@@ -165,11 +163,19 @@ interface SerperOrganic {
   snippet?: string;
 }
 
-async function searchWebForPlaylists(query: string): Promise<{ id: string; name: string; description: string; spotifyUrl: string }[]> {
+const PLATFORM_SITE: Record<Platform, string> = {
+  spotify: 'site:open.spotify.com/playlist',
+  apple:   'site:music.apple.com/playlist OR site:music.apple.com/us/playlist',
+  youtube: 'site:youtube.com/playlist',
+};
+
+interface RawPlaylist { id: string; name: string; description: string; url: string; platform: Platform }
+
+async function searchWebForPlaylists(query: string, platform: Platform): Promise<RawPlaylist[]> {
   const res = await fetch('https://google.serper.dev/search', {
     method: 'POST',
     headers: { 'X-API-KEY': SERPER_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ q: `site:open.spotify.com/playlist ${query}`, num: 10 }),
+    body: JSON.stringify({ q: `${PLATFORM_SITE[platform]} ${query}`, num: 10 }),
   });
 
   if (!res.ok) {
@@ -181,19 +187,34 @@ async function searchWebForPlaylists(query: string): Promise<{ id: string; name:
   const seen = new Set<string>();
 
   return ((data.organic ?? []) as SerperOrganic[])
-    .map(r => {
-      const id = r.link.match(/playlist\/([A-Za-z0-9]+)/)?.[1];
-      if (!id || seen.has(id)) return null;
+    .map((r): RawPlaylist | null => {
+      let id: string | undefined;
+      let url: string;
+
+      if (platform === 'spotify') {
+        id = r.link.match(/playlist\/([A-Za-z0-9]+)/)?.[1];
+        if (!id) return null;
+        url = `https://open.spotify.com/playlist/${id}`;
+      } else if (platform === 'apple') {
+        id = r.link.match(/pl\.[A-Za-z0-9]+/)?.[0] ?? r.link;
+        url = r.link;
+      } else {
+        id = r.link.match(/[?&]list=([A-Za-z0-9_-]+)/)?.[1] ?? r.link;
+        url = r.link;
+      }
+
+      if (seen.has(id)) return null;
       seen.add(id);
-      const name = r.title.split(' • ')[0]?.trim() ?? r.title;
+
       return {
         id,
-        name,
+        name: r.title.split(' • ')[0]?.trim() ?? r.title,
         description: r.snippet ?? '',
-        spotifyUrl: `https://open.spotify.com/playlist/${id}`,
+        url,
+        platform,
       };
     })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .filter((x): x is RawPlaylist => x !== null)
     .filter(x => {
       const text = `${x.name} ${x.description}`.toLowerCase();
       return !/(podcast|episode|interview|show notes|hosted by|host:|listen now|guest:|chapter \d)/i.test(text);
@@ -210,11 +231,11 @@ async function searchBlogForArtist(
   favoriteArtists: string[],
 ): Promise<string | null> {
   try {
-    const artist = answers.artist_lane?.startsWith('custom:') ? answers.artist_lane.slice(7) : null;
-    const genre = answers.genre_vibe?.startsWith('genre:') ? answers.genre_vibe.slice(6) : null;
-    const eraText = answers.era ? ERA[answers.era] ?? null : null;
+    const artist      = answers.artist_lane?.startsWith('custom:') ? answers.artist_lane.slice(7) : null;
+    const inferredGenre = answers.inferred_genre ?? null;
+    const eraText     = answers.era_pull ? ERA_TEXT[answers.era_pull] ?? null : null;
+    const focus       = artist ?? inferredGenre ?? favoriteArtists[0] ?? null;
 
-    const focus = artist ?? genre ?? favoriteArtists[0] ?? null;
     if (!focus) return null;
 
     const q = [focus, eraText, 'recommendation'].filter(Boolean).join(' ');
@@ -265,11 +286,8 @@ async function searchBlogForArtist(
 
 // ─── Obsessed mode — find a playlist that definitely has the artist ───────────
 
-async function searchBlogPlaylistForArtist(
-  artistName: string,
-): Promise<{ id: string; name: string; description: string; spotifyUrl: string } | null> {
+async function searchBlogPlaylistForArtist(artistName: string): Promise<RawPlaylist | null> {
   try {
-    // First: search music blogs for articles that embed a Spotify playlist for this artist
     const blogRes = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: { 'X-API-KEY': SERPER_KEY, 'Content-Type': 'application/json' },
@@ -282,17 +300,11 @@ async function searchBlogPlaylistForArtist(
         const combined = `${r.link} ${r.snippet ?? ''}`;
         const match = combined.match(/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)/);
         if (match) {
-          return {
-            id: match[1],
-            name: r.title.split(' • ')[0]?.trim() ?? r.title,
-            description: r.snippet ?? '',
-            spotifyUrl: `https://open.spotify.com/playlist/${match[1]}`,
-          };
+          return { id: match[1], name: r.title.split(' • ')[0]?.trim() ?? r.title, description: r.snippet ?? '', url: `https://open.spotify.com/playlist/${match[1]}`, platform: 'spotify' };
         }
       }
     }
 
-    // Fallback: Spotify playlists whose title/description directly mentions the artist
     const spotifyRes = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: { 'X-API-KEY': SERPER_KEY, 'Content-Type': 'application/json' },
@@ -306,12 +318,7 @@ async function searchBlogPlaylistForArtist(
     const id = first.link.match(/playlist\/([A-Za-z0-9]+)/)?.[1];
     if (!id) return null;
 
-    return {
-      id,
-      name: first.title.split(' • ')[0]?.trim() ?? first.title,
-      description: first.snippet ?? '',
-      spotifyUrl: `https://open.spotify.com/playlist/${id}`,
-    };
+    return { id, name: first.title.split(' • ')[0]?.trim() ?? first.title, description: first.snippet ?? '', url: `https://open.spotify.com/playlist/${id}`, platform: 'spotify' };
   } catch {
     return null;
   }
@@ -319,11 +326,17 @@ async function searchBlogPlaylistForArtist(
 
 // ─── Spotify oembed — fetch thumbnail ────────────────────────────────────────
 
-async function fetchThumbnail(playlistId: string): Promise<string | null> {
+async function fetchThumbnail(p: RawPlaylist): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://open.spotify.com/oembed?url=https://open.spotify.com/playlist/${playlistId}`,
-    );
+    let oembedUrl: string;
+    if (p.platform === 'spotify') {
+      oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(p.url)}`;
+    } else if (p.platform === 'youtube') {
+      oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(p.url)}&format=json`;
+    } else {
+      return null;
+    }
+    const res = await fetch(oembedUrl);
     if (!res.ok) return null;
     const data = await res.json();
     return (data.thumbnail_url as string | undefined) ?? null;
@@ -332,24 +345,23 @@ async function fetchThumbnail(playlistId: string): Promise<string | null> {
   }
 }
 
-// ─── Scenario-based selection (using search rank as popularity proxy) ─────────
+// ─── Scenario-based selection ─────────────────────────────────────────────────
 
-function pickByScenario(
-  candidates: { id: string; name: string; description: string; spotifyUrl: string }[],
-  scenario: string,
-): typeof candidates {
+function pickByDiscoveryMode(candidates: RawPlaylist[], discoveryMode: string): RawPlaylist[] {
   const m = candidates.length;
   if (m === 0) return [];
 
-  if (scenario === 'obscure' || scenario === 'discovery' || scenario === 'deep_cuts') {
+  if (discoveryMode === 'digging') {
     return candidates.slice(Math.max(0, m - 3)).reverse();
   }
 
   const startFraction: Record<string, number> = {
-    hits: 0, singalong: 0,
-    popular: 0.25, nostalgic: 0.25,
+    algorithm:  0,
+    same_stuff: 0,
+    friend_trust:    0.2,
+    artist_to_artist: 0.2,
   };
-  const frac = startFraction[scenario] ?? 0;
+  const frac = startFraction[discoveryMode] ?? 0;
   const startIdx = Math.min(Math.floor(m * frac), Math.max(0, m - 3));
   return candidates.slice(startIdx, startIdx + 3);
 }
@@ -361,48 +373,38 @@ async function findPlaylists(
   favoriteArtists: string[],
   skipArtists: string[],
 ): Promise<PlaylistSearchResult> {
+  const platform = resolvePlatform(answers);
   const searchQuery = await buildSearchQuery(answers, favoriteArtists, skipArtists);
-  console.log('[playlist] query:', searchQuery);
-
-  const isDiscoveryMode =
-    answers.listening_scenario === 'popular' || answers.listening_scenario === 'deep_cuts';
+  console.log('[playlist] query:', searchQuery, 'platform:', platform);
 
   const hasChosenArtist = !!answers.artist_lane?.startsWith('custom:');
-  const isObsessedAspect = answers.artist_aspect === 'aspect:obsessed';
-  const isEraObsessed = answers.era === 'discovery';
-  const shouldRunBlogArtist = (hasChosenArtist || isEraObsessed) && !isObsessedAspect;
+  const isDeepDiscovery = answers.discovery_mode === 'digging' || answers.discovery_mode === 'artist_to_artist';
+  const shouldRunBlogArtist = hasChosenArtist && isDeepDiscovery && platform === 'spotify';
 
-  let picked: { id: string; name: string; description: string; spotifyUrl: string }[];
+  const raw = await searchWebForPlaylists(searchQuery, platform);
 
-  const raw = await searchWebForPlaylists(searchQuery);
+  let picked: RawPlaylist[];
 
-  if (isObsessedAspect && hasChosenArtist) {
+  if (shouldRunBlogArtist && hasChosenArtist) {
     const artistName = answers.artist_lane!.slice(7);
-    const blogPlaylist = await searchBlogPlaylistForArtist(artistName);
-    console.log('[playlist] obsessed blog playlist:', blogPlaylist?.name ?? null);
+    const [blogArtist, blogPlaylist] = await Promise.all([
+      searchBlogForArtist(answers, favoriteArtists),
+      searchBlogPlaylistForArtist(artistName),
+    ]);
 
-    const standard = raw.slice(0, blogPlaylist ? 2 : 3);
-    picked = blogPlaylist ? [...standard, blogPlaylist].slice(0, 3) : standard;
-  } else if (shouldRunBlogArtist) {
-    const blogArtist = await searchBlogForArtist(answers, favoriteArtists);
-    console.log('[playlist] blog artist:', blogArtist);
-
-    const standardCount = blogArtist ? 2 : 3;
-    const standard = pickByScenario(raw, answers.listening_scenario ?? 'hits').slice(0, standardCount);
-
-    let blogPick: typeof raw = [];
+    const standard = raw.slice(0, blogPlaylist ? 1 : blogArtist ? 2 : 3);
+    let blogPick: RawPlaylist[] = [];
     if (blogArtist) {
-      const eraText = answers.era ? ERA[answers.era] ?? '' : '';
-      const blogRaw = await searchWebForPlaylists(`${blogArtist} ${eraText}`.trim());
+      const eraText = answers.era_pull ? ERA_TEXT[answers.era_pull] ?? '' : '';
+      const blogRaw = await searchWebForPlaylists(`${blogArtist} ${eraText}`.trim(), 'spotify');
       blogPick = blogRaw.slice(0, 1);
     }
-
-    picked = [...standard, ...blogPick].slice(0, 3);
+    picked = [...standard, ...blogPick, ...(blogPlaylist ? [blogPlaylist] : [])].slice(0, 3);
   } else {
-    picked = pickByScenario(raw, isDiscoveryMode ? answers.listening_scenario : (answers.listening_scenario ?? 'hits')).slice(0, 3);
+    picked = pickByDiscoveryMode(raw, answers.discovery_mode ?? 'friend_trust').slice(0, 3);
   }
 
-  const thumbnails = await Promise.all(picked.map(p => fetchThumbnail(p.id)));
+  const thumbnails = await Promise.all(picked.map(p => fetchThumbnail(p)));
 
   const playlists: PlaylistResult[] = picked.map((p, i) => ({
     ...p,
@@ -417,27 +419,9 @@ async function findPlaylists(
 const DEMO_RESULT: PlaylistSearchResult = {
   searchQuery: 'indie electronic dream pop',
   playlists: [
-    {
-      id: 'demo_p1',
-      name: 'late night frequencies',
-      description: 'electronic and indie for the hours when everything slows down',
-      spotifyUrl: 'https://open.spotify.com/genre/indie-page',
-      thumbnailUrl: null,
-    },
-    {
-      id: 'demo_p2',
-      name: 'bedroom pop essentials',
-      description: 'intimate, lo-fi, and just a little hazy',
-      spotifyUrl: 'https://open.spotify.com/genre/lofi-page',
-      thumbnailUrl: null,
-    },
-    {
-      id: 'demo_p3',
-      name: 'underground sounds',
-      description: 'hidden gems from the edges of indie and electronic',
-      spotifyUrl: 'https://open.spotify.com/genre/electronic-page',
-      thumbnailUrl: null,
-    },
+    { id: 'demo_p1', name: 'late night frequencies', description: 'electronic and indie for the hours when everything slows down', url: 'https://open.spotify.com/genre/indie-page', platform: 'spotify', thumbnailUrl: null },
+    { id: 'demo_p2', name: 'bedroom pop essentials', description: 'intimate, lo-fi, and just a little hazy', url: 'https://open.spotify.com/genre/lofi-page', platform: 'spotify', thumbnailUrl: null },
+    { id: 'demo_p3', name: 'underground sounds', description: 'hidden gems from the edges of indie and electronic', url: 'https://open.spotify.com/genre/electronic-page', platform: 'spotify', thumbnailUrl: null },
   ],
 };
 
