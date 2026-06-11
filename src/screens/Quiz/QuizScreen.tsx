@@ -17,8 +17,8 @@ import { cn } from '@src/utils/cn';
 import { useTheme } from '@src/state/theme/ThemeProvider';
 import { useArtistPreferences } from '@src/state/artistPreferences/ArtistPreferencesProvider';
 import { useAnalytics } from '@src/analytics';
-import { QUESTIONS, ANSWER_TRAITS, NARRATOR_REACTIONS, DEFAULT_TRAITS } from '@src/config/quiz';
-import type { Traits, QuizOption } from '@src/config/quiz';
+import { QUESTIONS, NARRATOR_REACTIONS } from '@src/config/quiz';
+import type { QuizOption } from '@src/config/quiz';
 import type { AppStackParamList } from '@src/navigation/AppNavigator';
 
 const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
@@ -476,7 +476,6 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [lastReaction, setLastReaction] = useState<string | null>(null);
-  const [traits, setTraits] = useState<Traits>(DEFAULT_TRAITS);
 
   const pendingAnswersRef = useRef<Record<string, string>>({});
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -517,18 +516,6 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
       setPendingSelection(value);
 
       const lookupKey = question.id === 'age_range' ? ageValueToBucket(value) : value;
-      const delta = ANSWER_TRAITS[lookupKey];
-      if (delta) {
-        setTraits(prev => ({
-          depth:      prev.depth      + (delta.depth      ?? 0),
-          social:     prev.social     + (delta.social     ?? 0),
-          edge:       prev.edge       + (delta.edge       ?? 0),
-          discovery:  prev.discovery  + (delta.discovery  ?? 0),
-          nostalgia:  prev.nostalgia  + (delta.nostalgia  ?? 0),
-          expression: prev.expression + (delta.expression ?? 0),
-        }));
-      }
-
       const reaction = NARRATOR_REACTIONS[lookupKey] ?? null;
 
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
@@ -546,11 +533,8 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
         }
       }, 250);
     },
-    [analytics, answers, currentIndex, navigation, pendingSelection, question, traits, addFavorite, removeFavorite],
+    [analytics, answers, currentIndex, navigation, pendingSelection, question, addFavorite, removeFavorite],
   );
-
-  // Suppress unused variable warning — traits are recorded for future use
-  void traits;
 
   const handleBack = useCallback(() => {
     if (pendingSelection || currentIndex === 0) return;

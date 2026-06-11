@@ -16,7 +16,7 @@ const CARDS = [
     glow: 'rgba(191,95,255,0.35)',
     circleBg: 'rgba(191,95,255,0.1)',
     title: 'Who are you?',
-    body: 'Answer 8 quick questions about your personality, lifestyle, and what you\'re drawn to.',
+    body: 'Answer some quick questions about your personality, lifestyle, and what you\'re drawn to.',
   },
   {
     emoji: '✨',
@@ -54,7 +54,7 @@ export const OnboardingScreen: React.FC<Props> = ({ navigation }) => {
   }, [navigation]);
 
   return (
-    <StarryScreen style={{ flex: 1 }}>
+    <StarryScreen>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
 

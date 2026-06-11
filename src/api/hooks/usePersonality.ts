@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useArtistPreferences } from '@src/state/artistPreferences/ArtistPreferencesProvider';
-
 const OPENAI_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 
 export interface PersonalityResult {
@@ -29,11 +27,12 @@ const GENDER_LABEL: Record<string, string> = {
   gender_skip:  'prefers not to say',
 };
 
-const LIFE_PHASE_LABEL: Record<string, string> = {
-  locked_in:    'goal-driven, building mode — career or project focused, disciplined',
-  figuring_out: 'transitional, open, still discovering their direction in life',
-  peak_social:  'highly social, event-driven, surrounded by people and energy',
-  own_world:    'introspective, self-contained, low-key lifestyle, minimal drama',
+const ASPIRATION_LABEL: Record<string, string> = {
+  aspire_social:   'wants to become the social one — life of the party, always out, knows everyone. Push them toward music that fuels that energy.',
+  aspire_grind:    'wants to become the grinder — building something, locked in, ambitious. Push toward music that matches drive and focus.',
+  aspire_creative: 'wants to become the creative — expressing themselves, making things, standing out. Push toward music with artistic depth and edge.',
+  aspire_chill:    'wants to settle into themselves — peace over noise, not chasing anything. Push toward music that is smooth, intentional, assured.',
+  aspire_explorer: 'still figuring it out — open to everything, no fixed path. Use the other signals to steer them somewhere specific.',
 };
 
 const SOCIAL_ENERGY_LABEL: Record<string, string> = {
@@ -50,13 +49,6 @@ const SOCIAL_SELF_LABEL: Record<string, string> = {
   the_chill_one:     'easygoing, low-maintenance, relaxed — hard to rattle or excite',
 };
 
-const MUSIC_SCENE_LABEL: Record<string, string> = {
-  scene_underground: 'underground kid — record shops, obscure bands, Joy Division, heard it before anyone',
-  scene_pop:         'pop culture fan — lives for chart moments, Taylor Swift eras, every cultural banger',
-  scene_emotional:   'late night listener — Frank Ocean energy, 2am drives, music that makes them feel something real',
-  scene_explorer:    'constant digger — Shazam addict, always finding the next thing, playlist always evolving',
-  scene_energy:      'energy chaser — club, gym, concerts, needs music with momentum and power',
-};
 
 const CURRENT_MUSIC_LABEL: Record<string, string> = {
   music_rap:      'primarily rap and hip-hop',
@@ -82,44 +74,43 @@ const ERA_RESONANCE_LABEL: Record<string, string> = {
   era_now:   'current 2020s releases — not looking back, living in the present',
 };
 
-async function fetchPersonality(
-  answers: Record<string, string>,
-  favoriteArtists: string[],
-): Promise<PersonalityResult> {
+async function fetchPersonality(answers: Record<string, string>): Promise<PersonalityResult> {
   const artistName = answers.artist_lane?.startsWith('custom:')
     ? answers.artist_lane.slice(7)
     : null;
 
   const prompt = [
-    'You are a music consultant who reads personality and lifestyle signals to prescribe a music direction.',
-    'Your job is NOT to validate what this person already listens to.',
-    'Your job is to look at who they are — their personality, lifestyle, aspirations, and the era they resonate with — and tell them what music they SHOULD be exploring.',
-    'This is prescriptive and exciting, not just descriptive.',
+    'You are a music identity consultant. Your entire job is to read who this person IS — their personality, lifestyle, social energy, aspirations — and tell them what music they should be listening to instead of what they currently play.',
     '',
-    'Here is who this person is:',
+    'CRITICAL RULES:',
+    '1. The artist/genre they listed is where they ARE, not where they should be. Treat it as a starting signal only.',
+    '2. You MUST recommend a different direction. Do not suggest the same artist or genre they already listen to.',
+    '3. If their current taste clearly mismatches their personality (e.g. athletic social extrovert listening to pop), call it out directly and steer them somewhere that actually fits — EDM, house, hip-hop, drill, whatever matches WHO they are.',
+    '4. Be bold. Do not hedge. Tell them exactly what they should be listening to and why it fits THEM specifically.',
+    '5. The goal is discovery — they should finish reading and immediately want to open a new playlist.',
+    '',
+    'WHO THIS PERSON IS:',
     answers.age_range         ? `- Age: ${/^\d+$/.test(answers.age_range) ? answers.age_range : (AGE_LABEL[answers.age_range] ?? answers.age_range)}` : null,
     answers.gender            ? `- Gender: ${GENDER_LABEL[answers.gender] ?? answers.gender}` : null,
-    answers.life_phase        ? `- Life phase: ${LIFE_PHASE_LABEL[answers.life_phase] ?? answers.life_phase}` : null,
-    answers.social_energy     ? `- Social energy / personality type: ${SOCIAL_ENERGY_LABEL[answers.social_energy] ?? answers.social_energy}` : null,
-    answers.social_self       ? `- How friends describe them: ${SOCIAL_SELF_LABEL[answers.social_self] ?? answers.social_self}` : null,
-    answers.instruments       ? `- Plays an instrument: ${{ plays_yes: 'yes', plays_used_to: 'used to', plays_learning: 'no but wants to learn', plays_no: 'no — pure listener' }[answers.instruments] ?? answers.instruments}` : null,
-    answers.music_scene       ? `- Music scene they identify with: ${MUSIC_SCENE_LABEL[answers.music_scene] ?? answers.music_scene}` : null,
-    artistName                ? `- Artist they are listening to right now: ${artistName}` : null,
-    answers.current_music     ? `- Current playlist sound: ${CURRENT_MUSIC_LABEL[answers.current_music] ?? answers.current_music}` : null,
+    answers.location          ? `- Location: ${answers.location.startsWith('custom:') ? answers.location.slice(7) : answers.location} — factor in what genres and scenes are culturally dominant or emerging in this area` : null,
+    answers.aspiration        ? `- Who they are working toward becoming: ${ASPIRATION_LABEL[answers.aspiration] ?? answers.aspiration}` : null,
+    answers.social_energy     ? `- Social energy: ${SOCIAL_ENERGY_LABEL[answers.social_energy] ?? answers.social_energy}` : null,
+    answers.social_self       ? `- How friends see them: ${SOCIAL_SELF_LABEL[answers.social_self] ?? answers.social_self}` : null,
+    answers.instruments       ? `- Instruments: ${{ plays_yes: 'plays one or more', plays_used_to: 'used to play', plays_learning: 'wants to learn', plays_no: 'pure listener' }[answers.instruments] ?? answers.instruments}` : null,
+    artistName                ? `- Current artist they listen to (treat as starting point, NOT destination): ${artistName}` : null,
+    answers.current_music     ? `- Current genre (where they are, not where they should go): ${CURRENT_MUSIC_LABEL[answers.current_music] ?? answers.current_music}` : null,
     answers.missing_quality   ? `- Quality they want to be known for: ${MISSING_QUALITY_LABEL[answers.missing_quality] ?? answers.missing_quality}` : null,
-    answers.era_resonance     ? `- Era energy they want to channel: ${ERA_RESONANCE_LABEL[answers.era_resonance] ?? answers.era_resonance}` : null,
-    favoriteArtists.length > 0 ? `- Other artists they like: ${favoriteArtists.slice(0, 4).join(', ')}` : null,
+    answers.era_resonance     ? `- Era they resonate with most: ${ERA_RESONANCE_LABEL[answers.era_resonance] ?? answers.era_resonance} — weight your artist recommendations and playlists toward this era` : null,
     '',
-    'Give them a music identity that reflects who they are becoming, not just what they already play.',
-    'The full report will include curated Spotify playlists — your job is to build the identity and direction that those playlists will deliver on.',
+    'Now build them a music identity based on WHO THEY ARE — not what they currently play. Steer them into the lane that actually fits their personality.',
     '',
     'Return JSON with exactly these fields:',
     '{',
-    '  "title": "3-5 word music archetype in ALL CAPS, starting with THE. This should feel like a music identity they are stepping into, not a genre label.",',
-    '  "subtitle": "one punchy sentence. Make them feel like you read something specific about them. Reference their personality or era, not just their genre.",',
+    '  "title": "3-5 word music archetype in ALL CAPS, starting with THE. Should feel like an identity they are stepping INTO — bold, specific, not a genre label.",',
+    '  "subtitle": "one punchy sentence that makes them feel seen. Reference something specific about their personality, NOT their current artist.",',
     '  "color": "one of: pink, purple, blue, gold, green",',
-    '  "musicIdentity": "3-4 sentences. Open by naming what their current taste and personality reveal. Then pivot hard: tell them specifically what they should be listening to and why — name genres, scenes, movements, or eras. Be prescriptive and confident. This is a recommendation, not a description.",',
-    '  "growthDirection": "one actionable sentence starting with a verb. Name a specific genre, scene, or artist they should go deep on next — something adjacent to where they are but they have not fully committed to.",',
+    '  "musicIdentity": "3-4 sentences. First sentence: briefly acknowledge their current taste. Then pivot HARD — tell them what they should actually be listening to based on their personality and why it fits them. Name specific genres, scenes, movements. Be direct. No hedging.",',
+    '  "growthDirection": "one bold sentence starting with a verb. Name a specific genre, artist, or scene they should go all-in on — something that fits their personality perfectly but they have not discovered yet.",',
     '  "artistsToExplore": ["5-7 specific artist names they should be listening to based on their identity. Mix of entry points and deeper cuts. Real artists only."],',
     '  "blindSpot": "one punchy sentence naming the one genre, scene, or era they are sleeping on that would fit them perfectly — the thing they have not discovered yet but would love."',
     '}',
@@ -162,12 +153,11 @@ async function fetchPersonality(
 }
 
 export function usePersonality(answers: Record<string, string>) {
-  const { favoriteArtists } = useArtistPreferences();
   const enabled = Object.keys(answers).length > 0;
 
   return useQuery({
     queryKey: ['personality', answers],
-    queryFn: () => fetchPersonality(answers, favoriteArtists),
+    queryFn: () => fetchPersonality(answers),
     enabled,
     staleTime: Infinity,
     retry: 1,

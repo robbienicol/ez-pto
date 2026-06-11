@@ -11,7 +11,7 @@ import Animated, {
 import { cn } from '@src/utils/cn';
 import { ThemedText } from '@src/components/atoms/ThemedText';
 
-export type ThemedButtonVariant = 'primary' | 'secondary' | 'ghost' | 'primary-green';
+export type ThemedButtonVariant = 'primary' | 'secondary' | 'ghost';
 
 interface ThemedButtonProps extends Omit<PressableProps, 'children'> {
   label: string;
@@ -70,21 +70,18 @@ const containerClassName: Record<ThemedButtonVariant, string> = {
   primary: 'bg-primary dark:bg-primaryDark border border-white',
   secondary: 'bg-neonPurple/15 dark:bg-neonPurple/20 border border-neonPurple/40',
   ghost: 'bg-transparent',
-  'primary-green': 'bg-laserGreen border border-white',
 };
 
 const labelTone: Record<ThemedButtonVariant, Parameters<typeof ThemedText>[0]['tone']> = {
   primary: 'default',
   secondary: 'primary',
   ghost: 'primary',
-  'primary-green': 'default',
 };
 
 const labelClassName: Record<ThemedButtonVariant, string> = {
   primary: 'text-white font-nunito-extrabold',
   secondary: 'font-nunito-bold',
   ghost: 'font-nunito-semibold',
-  'primary-green': 'text-white font-nunito-extrabold',
 };
 
 export const ThemedButton: React.FC<ThemedButtonProps> = ({

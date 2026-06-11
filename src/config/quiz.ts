@@ -19,107 +19,18 @@ export interface QuizQuestion {
   writeInDefaultExpanded?: boolean;
 }
 
-export interface Traits {
-  depth: number;
-  social: number;
-  edge: number;
-  discovery: number;
-  nostalgia: number;
-  expression: number;
-}
-
-export const DEFAULT_TRAITS: Traits = {
-  depth: 0, social: 0, edge: 0, discovery: 0, nostalgia: 0, expression: 0,
-};
-
-export const ANSWER_TRAITS: Record<string, Partial<Traits>> = {
-  // age_range — context only, minimal trait weight
-  age_teens:    { social: 10, discovery: 10 },
-  age_early20s: { social: 15, discovery: 10 },
-  age_late20s:  { depth: 10, edge: 10 },
-  age_30s:      { depth: 15, nostalgia: 10 },
-  age_40plus:   { nostalgia: 15, depth: 10 },
-  // gender — context only, no trait weight
-  gender_man:    {},
-  gender_woman:  {},
-  gender_nb:     { expression: 5 },
-  gender_skip:   {},
-  // life_phase
-  locked_in:    { depth: 20, edge: 10 },
-  figuring_out: { discovery: 20, social: 10 },
-  peak_social:  { social: 25, expression: 15 },
-  own_world:    { depth: 25, edge: 15, nostalgia: 10 },
-  // social_energy
-  energy_social:        { social: 25, expression: 15 },
-  energy_small_circle:  { depth: 20, nostalgia: 10 },
-  energy_solo:          { depth: 15, edge: 15, discovery: 10 },
-  energy_mixed:         { social: 10, depth: 10 },
-  // social_self
-  the_fun_one:       { social: 25, expression: 15 },
-  the_deep_one:      { depth: 25, nostalgia: 10 },
-  the_ambitious_one: { edge: 20, depth: 15 },
-  the_chill_one:     { nostalgia: 15, depth: 10 },
-  // current_clothes
-  wear_athletic: { social: 15, edge: 10 },
-  wear_smart:    { expression: 15, social: 10 },
-  wear_street:   { edge: 20, social: 15 },
-  wear_comfort:  { depth: 10, nostalgia: 5 },
-  wear_creative: { expression: 25, discovery: 15 },
-  // instruments
-  plays_yes:      { depth: 20, expression: 15 },
-  plays_used_to:  { depth: 15, nostalgia: 10 },
-  plays_learning: { discovery: 20, expression: 10 },
-  plays_no:       { social: 5 },
-  // music_scene
-  scene_underground: { edge: 25, depth: 15, discovery: 10 },
-  scene_pop:         { social: 25, expression: 15 },
-  scene_emotional:   { depth: 20, nostalgia: 15, expression: 10 },
-  scene_explorer:    { discovery: 25, depth: 10 },
-  scene_energy:      { social: 20, edge: 15 },
-  // current_music
-  music_rap:      { edge: 15, social: 15 },
-  music_pop:      { social: 20, expression: 10 },
-  music_rock:     { edge: 20, depth: 10 },
-  music_rnb:      { expression: 20, nostalgia: 15 },
-  music_eclectic: { discovery: 25, depth: 10 },
-  // missing_quality
-  want_cool:     { edge: 20, expression: 15 },
-  want_deep:     { depth: 25, nostalgia: 10 },
-  want_intense:  { edge: 20, depth: 15 },
-  want_magnetic: { social: 25, expression: 15 },
-  want_creative: { expression: 25, discovery: 15 },
-  // era_resonance
-  // platform — context only
-  platform_spotify: {},
-  platform_apple:   {},
-  platform_youtube: { discovery: 5 },
-  platform_mixed:   { discovery: 5 },
-  // era_resonance
-  era_70s:   { nostalgia: 20, depth: 15, expression: 10 },
-  era_90s:   { edge: 25, depth: 15, nostalgia: 10 },
-  era_2000s: { nostalgia: 20, social: 15, expression: 10 },
-  era_2010s: { discovery: 20, depth: 15 },
-  era_now:   { social: 10, discovery: 10 },
-};
 
 export const NARRATOR_REACTIONS: Record<string, string> = {
-  age_teens:    "Peak everything.",
-  age_early20s: "Best years are happening right now.",
-  age_late20s:  "The real ones figure it out now.",
-  age_30s:      "Finally know what you like.",
-  age_40plus:   "Taste is earned.",
+
   gender_man:   "Got it.",
   gender_woman: "Got it.",
   gender_nb:    "Got it.",
   gender_skip:  "No problem.",
-  locked_in:         "Eyes on the target.",
-  figuring_out:      "Most honest answer in the room.",
-  peak_social:       "They know your name everywhere.",
-  own_world:         "Self-sufficient.",
-  energy_social:       "Everyone knows your name.",
-  energy_small_circle: "The right people know.",
-  energy_solo:         "The headphones say enough.",
-  energy_mixed:        "Selectively social.",
+  aspire_social:   "The room changes when you walk in.",
+  aspire_grind:    "Eyes on the prize.",
+  aspire_creative: "The best ones always need to make something.",
+  aspire_chill:    "Peace is underrated.",
+  aspire_explorer: "Most honest answer in the room.",
   the_fun_one:       "Everyone texts you first.",
   the_deep_one:      "People stay longer than they planned.",
   the_ambitious_one: "They can feel it on you.",
@@ -169,7 +80,8 @@ export const QUESTIONS: QuizQuestion[] = [
   },
   {
     id: 'gender',
-    prompt: 'How do you identify?',
+    prompt: 'What is your preferred gender?',
+    
     options: [
       { label: 'Male', value: 'gender_man' },
       { label: 'Female', value: 'gender_woman' },
@@ -177,19 +89,19 @@ export const QUESTIONS: QuizQuestion[] = [
       { label: 'Prefer not to say', value: 'gender_skip' },
     ],
   },
+
   {
-    id: 'life_phase',
-    prompt: 'Which of these feels most like your life right now?',
-    options: [
-      { label: 'Locked in — building something', sublabel: 'Career, business, a specific goal', value: 'locked_in' },
-      { label: 'Figuring it out', sublabel: 'Still finding my thing, in transition', value: 'figuring_out' },
-      { label: 'Peak social mode', sublabel: 'Events, people, always something going on', value: 'peak_social' },
-      { label: 'In my own world', sublabel: 'Head down, quiet life, low drama', value: 'own_world' },
-    ],
+    id: 'location',
+    prompt: 'Where are you based?',
+    subtitle: "Helps us know what's moving in your area",
+    options: [],
+    allowWriteIn: true,
+    writeInLabel: 'City or country...',
+    writeInDefaultExpanded: true,
   },
   {
     id: 'social_energy',
-    prompt: 'Which one is you?',
+    prompt: 'Where do you fall on the introverted/extroverted scale',
     options: [
       { label: 'Always with people', sublabel: 'Group chats popping, always doing something, know everyone', value: 'energy_social' },
       { label: 'Small circle, deep', sublabel: '2-3 people max, real conversations, don\'t need the crowd', value: 'energy_small_circle' },
@@ -198,24 +110,30 @@ export const QUESTIONS: QuizQuestion[] = [
     ],
   },
   {
-    id: 'music_scene',
-    prompt: 'Which of these is most you?',
+    id: 'aspiration',
+    prompt: 'Which version of yourself are you working toward?',
     options: [
-      { label: 'The underground kid', sublabel: 'Record shops, obscure bands, Joy Division — heard it before anyone else', value: 'scene_underground' },
-      { label: 'The pop culture fan', sublabel: 'Every Taylor era, chart bangers, lives for the cultural moment', value: 'scene_pop' },
-      { label: 'The late night listener', sublabel: '2am drives, Frank Ocean, music that makes you actually feel something', value: 'scene_emotional' },
-      { label: 'The constant digger', sublabel: 'Shazam everything, always finding the next thing before anyone else does', value: 'scene_explorer' },
-      { label: 'The energy chaser', sublabel: 'Club, gym, concerts — needs music with momentum and power', value: 'scene_energy' },
+      { label: 'The social one', sublabel: 'Always out, know everyone, life of the party', value: 'aspire_social' },
+      { label: 'The grinder', sublabel: 'Building something, locked in, nothing distracts me', value: 'aspire_grind' },
+      { label: 'The creative', sublabel: 'Expressing myself, making things, want to stand out', value: 'aspire_creative' },
+      { label: 'The settled one', sublabel: 'Not chasing anything, comfortable, peace over noise', value: 'aspire_chill' },
+      { label: 'Still figuring it out', sublabel: 'Open to everything, no fixed path, just exploring', value: 'aspire_explorer' },
     ],
   },
   {
     id: 'artist_lane',
-    prompt: "Type an artist you're actually listening to right now",
+    prompt: "which artist do you feel resonates with your current personality?",
     subtitle: 'Anyone — no judgment',
     options: [],
     allowWriteIn: true,
     writeInLabel: 'Type an artist...',
     writeInDefaultExpanded: true,
+  },
+  {
+    id: 'rate_app',
+    prompt: 'Would you mind rating the app?',
+    subtitle: 'It helps us reach more people',
+    options: [],
   },
   {
     id: 'instruments',
@@ -228,10 +146,15 @@ export const QUESTIONS: QuizQuestion[] = [
     ],
   },
   {
-    id: 'rate_app',
-    prompt: 'Would you mind rating the app?',
-    subtitle: 'It helps us reach more people',
-    options: [],
+    id: 'current_clothes',
+    prompt: 'What do you actually wear most days?',
+    options: [
+      { label: 'Gym / athletic wear', sublabel: "Joggers, hoodies, trainers — it's the uniform", value: 'wear_athletic' },
+      { label: 'Smart casual / business', sublabel: 'Clean, put together, office-ready', value: 'wear_smart' },
+      { label: 'Streetwear', sublabel: 'Fits, drops, culturally aware', value: 'wear_street' },
+      { label: "Whatever's comfortable", sublabel: 'No real aesthetic, functional over styled', value: 'wear_comfort' },
+      { label: 'Creative / expressive', sublabel: 'Vintage, artistic, hard to categorize', value: 'wear_creative' },
+    ],
   },
   {
     id: 'social_self',
@@ -241,17 +164,6 @@ export const QUESTIONS: QuizQuestion[] = [
       { label: 'The deep one', sublabel: 'Real conversations, thoughtful, not surface level', value: 'the_deep_one' },
       { label: 'The ambitious one', sublabel: 'Always working, always leveling up', value: 'the_ambitious_one' },
       { label: 'The chill one', sublabel: 'Easygoing, unbothered, go with the flow', value: 'the_chill_one' },
-    ],
-  },
-  {
-    id: 'current_clothes',
-    prompt: 'What do you actually wear most days?',
-    options: [
-      { label: 'Gym / athletic wear', sublabel: "Joggers, hoodies, trainers — it's the uniform", value: 'wear_athletic' },
-      { label: 'Smart casual / business', sublabel: 'Clean, put together, office-ready', value: 'wear_smart' },
-      { label: 'Streetwear', sublabel: 'Fits, drops, culturally aware', value: 'wear_street' },
-      { label: "Whatever's comfortable", sublabel: 'No real aesthetic, functional over styled', value: 'wear_comfort' },
-      { label: 'Creative / expressive', sublabel: 'Vintage, artistic, hard to categorize', value: 'wear_creative' },
     ],
   },
   {
@@ -278,23 +190,12 @@ export const QUESTIONS: QuizQuestion[] = [
   },
   {
     id: 'platform',
-    prompt: 'Where do you listen to music?',
+    prompt: 'Lastly, Where do you listen to music?',
     options: [
       { label: 'Spotify', value: 'platform_spotify' },
       { label: 'Apple Music', value: 'platform_apple' },
       { label: 'YouTube', value: 'platform_youtube' },
       { label: 'Mix of everything', value: 'platform_mixed' },
-    ],
-  },
-  {
-    id: 'era_resonance',
-    prompt: "Which era's energy speaks to where you want to be?",
-    options: [
-      { label: '70s soul & swagger', sublabel: 'Warm, confident, analog charisma', value: 'era_70s' },
-      { label: '90s raw & real', sublabel: 'Grunge, hip-hop, nothing was polished', value: 'era_90s' },
-      { label: 'Early 2000s confident', sublabel: 'Peak pop culture, swagger, maximalism', value: 'era_2000s' },
-      { label: '2010s indie discovery', sublabel: 'Blog era, lo-fi, every song a find', value: 'era_2010s' },
-      { label: 'Right now', sublabel: "Current wave, whatever's moving", value: 'era_now' },
     ],
   },
 ];

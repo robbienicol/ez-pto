@@ -248,7 +248,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
                         }}
                       >
                         {'Answer '}
-                        <Text style={{ color: '#FFD700' }}>8 questions</Text>
+                        <Text style={{ color: '#FFD700' }}>some questions</Text>
                         {'.\nDiscover your identity.'}
                       </Text>
                     </View>
