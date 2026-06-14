@@ -35,11 +35,12 @@ const ASPIRATION_LABEL: Record<string, string> = {
   aspire_explorer: 'still figuring it out — open to everything, no fixed path. Use the other signals to steer them somewhere specific.',
 };
 
-const SOCIAL_ENERGY_LABEL: Record<string, string> = {
-  energy_social:       'extrovert — always with people, group chats popping, social energy is high',
-  energy_small_circle: 'introvert with a small circle — deep with a few people, real conversations, not interested in the crowd',
-  energy_solo:         'solo preference — headphones in, doing their own thing, internal energy, mostly in their own world',
-  energy_mixed:        'ambivert — social when they want to be, alone when they need to be, goes either way',
+const SETTING_LABEL: Record<string, string> = {
+  setting_gym:    'currently at the gym or working out — needs high-energy, hard-hitting music',
+  setting_study:  'currently studying or grinding — needs focused, non-distracting music to lock in',
+  setting_social: 'currently in a social setting with people — needs feel-good, crowd-friendly energy',
+  setting_solo:   'currently alone, late night or winding down — needs atmospheric, introspective music',
+  setting_drive:  'currently driving or on the move — needs momentum-driven music for the road',
 };
 
 const SOCIAL_SELF_LABEL: Record<string, string> = {
@@ -59,11 +60,11 @@ const CURRENT_MUSIC_LABEL: Record<string, string> = {
 };
 
 const MISSING_QUALITY_LABEL: Record<string, string> = {
-  want_cool:     'wants to be perceived as effortlessly cool and stylish',
-  want_deep:     'wants to be seen as intellectually interesting and worth knowing',
-  want_intense:  'wants to be perceived as focused, driven, and serious',
-  want_magnetic: 'wants to be the kind of person who lights up a room and draws people in',
-  want_creative: 'wants to be recognized as a creative and expressive person',
+  want_intense:  'wants a playlist that makes them feel unstoppable — high energy, locked in',
+  want_deep:     'wants a playlist that takes them somewhere new — deep cuts, discovery, never heard before',
+  want_creative: 'wants a playlist that hits them in the feels — emotional, moving, personal',
+  want_cool:     'wants a playlist that feels cool and effortless — smooth, confident, understated',
+  want_magnetic: 'wants a playlist that gets the party going — high energy, feel-good, social',
 };
 
 const ERA_RESONANCE_LABEL: Record<string, string> = {
@@ -94,12 +95,13 @@ async function fetchPersonality(answers: Record<string, string>): Promise<Person
     answers.gender            ? `- Gender: ${GENDER_LABEL[answers.gender] ?? answers.gender}` : null,
     answers.location          ? `- Location: ${answers.location.startsWith('custom:') ? answers.location.slice(7) : answers.location} — factor in what genres and scenes are culturally dominant or emerging in this area` : null,
     answers.aspiration        ? `- Who they are working toward becoming: ${ASPIRATION_LABEL[answers.aspiration] ?? answers.aspiration}` : null,
-    answers.social_energy     ? `- Social energy: ${SOCIAL_ENERGY_LABEL[answers.social_energy] ?? answers.social_energy}` : null,
+    answers.social_energy     ? `- Current setting / context: ${SETTING_LABEL[answers.social_energy] ?? answers.social_energy}` : null,
     answers.social_self       ? `- How friends see them: ${SOCIAL_SELF_LABEL[answers.social_self] ?? answers.social_self}` : null,
     answers.instruments       ? `- Instruments: ${{ plays_yes: 'plays one or more', plays_used_to: 'used to play', plays_learning: 'wants to learn', plays_no: 'pure listener' }[answers.instruments] ?? answers.instruments}` : null,
     artistName                ? `- Current artist they listen to (treat as starting point, NOT destination): ${artistName}` : null,
+    answers.genre_resonance   ? `- The specific sub-genre that resonates most with them: ${answers.genre_resonance}` : null,
     answers.current_music     ? `- Current genre (where they are, not where they should go): ${CURRENT_MUSIC_LABEL[answers.current_music] ?? answers.current_music}` : null,
-    answers.missing_quality   ? `- Quality they want to be known for: ${MISSING_QUALITY_LABEL[answers.missing_quality] ?? answers.missing_quality}` : null,
+    answers.missing_quality   ? `- Playlist vibe they are looking for: ${MISSING_QUALITY_LABEL[answers.missing_quality] ?? answers.missing_quality}` : null,
     answers.era_resonance     ? `- Era they resonate with most: ${ERA_RESONANCE_LABEL[answers.era_resonance] ?? answers.era_resonance} — weight your artist recommendations and playlists toward this era` : null,
     '',
     'Now build them a music identity based on WHO THEY ARE — not what they currently play. Steer them into the lane that actually fits their personality.',

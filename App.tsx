@@ -23,6 +23,7 @@ import { queryClient } from '@src/api/client/queryClient';
 import { RootNavigator } from '@src/navigation/RootNavigator';
 import { ThemeProvider, useTheme } from '@src/state/theme/ThemeProvider';
 import { ArtistPreferencesProvider } from '@src/state/artistPreferences/ArtistPreferencesProvider';
+import { SavedPlaylistsProvider } from '@src/state/savedPlaylists/SavedPlaylistsProvider';
 SplashScreen.preventAutoHideAsync();
 
 function AppShell() {
@@ -33,8 +34,10 @@ function AppShell() {
       <NavigationContainer>
         <PostHogProvider apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? ''} options={{ host: 'https://us.i.posthog.com', captureScreens: false, debug: __DEV__ }}>
           <ArtistPreferencesProvider>
-            <RootNavigator />
-            <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
+            <SavedPlaylistsProvider>
+              <RootNavigator />
+              <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
+            </SavedPlaylistsProvider>
           </ArtistPreferencesProvider>
         </PostHogProvider>
       </NavigationContainer>

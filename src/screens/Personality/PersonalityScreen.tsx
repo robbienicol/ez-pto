@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Pressable, Text, View, ScrollView, ActivityIndicator } from 'react-native';
+import { Dimensions, Pressable, Text, View, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   useAnimatedStyle,
@@ -10,10 +11,13 @@ import Animated, {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { ThemedButton } from '@src/components/atoms/ThemedButton';
+import { StarryScreen } from '@src/components/atoms/StarryScreen';
+import { DancingLoader } from '@src/components/atoms/DancingLoader';
 import { usePersonality } from '@src/api/hooks/usePersonality';
 import type { AppStackParamList } from '@src/navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Personality'>;
+
 
 const { width: SW } = Dimensions.get('window');
 
@@ -135,36 +139,24 @@ export const PersonalityScreen: React.FC<Props> = ({ navigation, route }) => {
   const columnColor = accent + '55';
 
   if (status === 'pending') {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#04001A' }}>
-        <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24, paddingHorizontal: 32 }}>
-          <ActivityIndicator size="large" color="#BF5FFF" />
-          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: '#BF5FFF', textAlign: 'center' }}>
-            Reading your vibe...
-          </Text>
-          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: '#ffffff55', textAlign: 'center' }}>
-            Building your music identity
-          </Text>
-        </SafeAreaView>
-      </View>
-    );
+    return <DancingLoader />;
   }
 
   if (status === 'error' || !personality) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#04001A' }}>
+      <StarryScreen className="flex-1">
         <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 32 }}>
           <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: '#FF4DB3', textAlign: 'center' }}>
             Something went wrong
           </Text>
           <ThemedButton label="Go back" variant="ghost" onPress={handleBack} />
         </SafeAreaView>
-      </View>
+      </StarryScreen>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#04001A' }}>
+    <StarryScreen className="flex-1">
       <PixelColumn side="left"  color={columnColor} />
       <PixelColumn side="right" color={columnColor} />
 
@@ -219,6 +211,6 @@ export const PersonalityScreen: React.FC<Props> = ({ navigation, route }) => {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
-    </View>
+    </StarryScreen>
   );
 };

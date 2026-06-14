@@ -1,13 +1,15 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import { Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { ThemedButton } from '@src/components/atoms/ThemedButton';
+import { DancingLoader } from '@src/components/atoms/DancingLoader';
+import { PlaylistCard } from '@src/components/molecules/PlaylistCard';
 import { usePersonality } from '@src/api/hooks/usePersonality';
-import { usePlaylistRecommendation, type PlaylistResult } from '@src/api/hooks/usePlaylistRecommendation';
+import { usePlaylistRecommendation } from '@src/api/hooks/usePlaylistRecommendation';
 import { useAnalytics } from '@src/analytics';
+import { useSavedPlaylists } from '@src/state/savedPlaylists/SavedPlaylistsProvider';
 import type { AppStackParamList } from '@src/navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'FullReport'>;
@@ -33,58 +35,6 @@ function SectionHeader({ label, accent }: { label: string; accent: string }) {
   );
 }
 
-// ─── Playlist card ────────────────────────────────────────────────────────────
-
-const PLATFORM_LABEL: Record<string, string> = {
-  spotify: 'OPEN IN SPOTIFY →',
-  apple:   'OPEN IN APPLE MUSIC →',
-  youtube: 'OPEN ON YOUTUBE →',
-};
-
-function PlaylistCard({ playlist, accent }: { playlist: PlaylistResult; accent: string }) {
-  const handleOpen = useCallback(() => {
-    if (playlist.platform === 'spotify') {
-      Linking.openURL(`spotify://playlist/${playlist.id}`).catch(() => Linking.openURL(playlist.url));
-    } else if (playlist.platform === 'apple') {
-      Linking.openURL(playlist.url.replace('https://', 'music://')).catch(() => Linking.openURL(playlist.url));
-    } else {
-      Linking.openURL(playlist.url);
-    }
-  }, [playlist]);
-
-  return (
-    <Pressable
-      onPress={handleOpen}
-      accessibilityRole="button"
-      style={{ borderColor: accent + '88', borderWidth: 1.5, borderRadius: 14, overflow: 'hidden' }}
-      className="active:opacity-70"
-    >
-      {playlist.thumbnailUrl ? (
-        <Image
-          source={{ uri: playlist.thumbnailUrl }}
-          style={{ width: '100%', aspectRatio: 1 }}
-          contentFit="cover"
-        />
-      ) : (
-        <View style={{ width: '100%', aspectRatio: 1, backgroundColor: '#1a0a3a' }} />
-      )}
-      <View style={{ padding: 14, gap: 4, backgroundColor: '#0A0120' }}>
-        <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 15, color: '#FFFFFF' }} numberOfLines={2}>
-          {playlist.name}
-        </Text>
-        {playlist.description ? (
-          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 18 }} numberOfLines={2}>
-            {playlist.description}
-          </Text>
-        ) : null}
-        <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, color: accent, marginTop: 4, letterSpacing: 2 }}>
-          {PLATFORM_LABEL[playlist.platform] ?? 'OPEN →'}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export const FullReportScreen: React.FC<Props> = ({ navigation, route }) => {
@@ -92,7 +42,12 @@ export const FullReportScreen: React.FC<Props> = ({ navigation, route }) => {
   const { data: personality, status: personalityStatus } = usePersonality(answers);
   const { data: playlistResult, status: playlistStatus, refetch } = usePlaylistRecommendation(answers);
   const analytics = useAnalytics();
+  const { markQuizCompleted } = useSavedPlaylists();
   const trackedRef = useRef(false);
+
+  React.useEffect(() => {
+    markQuizCompleted();
+  }, [markQuizCompleted]);
 
   React.useEffect(() => {
     if (playlistStatus === 'success' && playlistResult && !trackedRef.current) {
@@ -118,19 +73,7 @@ export const FullReportScreen: React.FC<Props> = ({ navigation, route }) => {
   const hasError  = personalityStatus === 'error' || playlistStatus === 'error';
 
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#04001A' }}>
-        <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20, paddingHorizontal: 32 }}>
-          <ActivityIndicator size="large" color={accent} />
-          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: accent, textAlign: 'center' }}>
-            Building your report...
-          </Text>
-          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
-            Finding your playlists and music direction
-          </Text>
-        </SafeAreaView>
-      </View>
-    );
+    return <DancingLoader title="Building your report..." subtitle="Finding your playlists and music direction" />;
   }
 
   if (hasError || !personality) {
@@ -140,7 +83,7 @@ export const FullReportScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: '#FF4DB3', textAlign: 'center' }}>
             Something went wrong
           </Text>
-          <ThemedButton label="Try again" variant="primary" onPress={() => refetch()} />
+          {/* <ThemedButton label="Try again" variant="primary" onPress={() => refetch()} /> */}
           <ThemedButton label="Start over" variant="ghost" onPress={handleRetake} />
         </SafeAreaView>
       </View>
@@ -289,6 +232,7 @@ export const FullReportScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* ── Actions ── */}
             <View style={{ gap: 12 }}>
               <ThemedButton label="Take it again" variant="ghost" onPress={handleRetake} />
+              <ThemedButton label="Try again" variant="ghost" onPress={() => refetch()} />
             </View>
 
             <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>

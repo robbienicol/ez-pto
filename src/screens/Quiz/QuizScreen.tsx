@@ -37,13 +37,24 @@ async function fetchArtistGenres(artistName: string): Promise<GenreData> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o',
       messages: [{
         role: 'user',
-        content: `Artist name (may be misspelled): "${artistName}"\n\nFix any spelling mistakes and return 4 genre tags for this artist.\nReturn JSON: { "correctedName": "Exact Artist Name", "genres": ["genre1", "genre2", "genre3", "genre4"] }\nGenres must be short lowercase labels like "indie rock", "hip-hop", "dream pop", "r&b". Max 3 words each.`,
+        content: `Artist name (may be misspelled): "${artistName}"
+
+1. Correct any spelling mistakes in the artist name.
+2. Return 4 specific, accurate sub-genre labels that describe this artist's actual sound.
+
+Rules:
+- Be as specific as possible. Think carefully about their actual sound, not just their broad category.
+- Use niche, descriptive sub-genres. Good examples: "post-punk", "krautrock", "neo-soul", "cloud rap", "shoegaze", "motorik", "witch house", "art rock", "industrial pop", "lo-fi hip-hop", "midwest emo", "afrobeats", "hyperpop", "dream pop", "noise rock", "trap soul"
+- Avoid generic, useless labels like just "indie", "alternative", "pop", "rock", "electronic" on their own — always combine with something more specific (e.g. "indie folk", "art pop", NOT just "indie" or "pop")
+- All lowercase, max 3 words each
+
+Return JSON: { "correctedName": "Exact Artist Name", "genres": ["genre1", "genre2", "genre3", "genre4"] }`,
       }],
       response_format: { type: 'json_object' },
-      max_tokens: 80,
+      max_tokens: 100,
       temperature: 0.2,
     }),
   });
@@ -433,6 +444,13 @@ function QuestionContent({
           <AgePicker onSelect={onSelect} isLocked={pendingSelection !== null} />
         ) : questionId === 'rate_app' ? (
           <RateCard onSelect={onSelect} isLocked={pendingSelection !== null} />
+        ) : questionId === 'genre_resonance' && options.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 24, gap: 12 }}>
+            <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+            <RNText style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>
+              Looking up genres...
+            </RNText>
+          </View>
         ) : (
           <>
             {options.map((opt, idx) => (
@@ -468,7 +486,7 @@ function QuestionContent({
 
 export const QuizScreen: React.FC<Props> = ({ navigation }) => {
   const { tokens } = useTheme();
-  const { addFavorite, removeFavorite } = useArtistPreferences();
+  const { favoriteArtists, addFavorite, removeFavorite } = useArtistPreferences();
   const analytics = useAnalytics();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -502,6 +520,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
             ...prev,
             artist_lane: `custom:${result.correctedName}`,
             inferred_genre: result.genres[0] ?? '',
+            artist_genres: result.genres.join(','),
           }));
           if (result.correctedName.toLowerCase() !== rawName.toLowerCase()) {
             removeFavorite(rawName);
@@ -529,12 +548,21 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
           setCurrentIndex(i => i + 1);
         } else {
           analytics.quizCompleted(pendingAnswersRef.current);
-          navigation.navigate('Personality', { answers: pendingAnswersRef.current });
+          navigation.navigate('FullReport', { answers: pendingAnswersRef.current });
         }
       }, 250);
     },
     [analytics, answers, currentIndex, navigation, pendingSelection, question, addFavorite, removeFavorite],
   );
+
+  // Auto-skip genre_resonance only if the user never typed an artist
+  useEffect(() => {
+    const typedArtist = answers.artist_lane?.startsWith('custom:');
+    if (question?.id === 'genre_resonance' && !typedArtist) {
+      setSlideDirection(1);
+      setCurrentIndex(i => i + 1);
+    }
+  }, [question?.id, answers.artist_lane]);
 
   const handleBack = useCallback(() => {
     if (pendingSelection || currentIndex === 0) return;
@@ -553,7 +581,29 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  const resolvedPrompt = lastReaction ? `${lastReaction} ${question.prompt}` : question.prompt;
+  const resolvedOptions = useMemo(() => {
+    if (question.id === 'genre_resonance' && answers.artist_genres) {
+      return answers.artist_genres.split(',').map(g => ({ label: g, value: g }));
+    }
+    if (question.id === 'artist_lane' && favoriteArtists.length > 0) {
+      return favoriteArtists.slice(0, 3).map(a => ({
+        label: a,
+        value: `custom:${a}`,
+      }));
+    }
+    return question.options;
+  }, [question.id, question.options, answers.artist_genres, favoriteArtists]);
+
+  const basePrompt = question.id === 'genre_resonance'
+    ? (() => {
+        const artist = answers.artist_lane?.startsWith('custom:') ? answers.artist_lane.slice(7) : null;
+        return artist
+          ? `Which of ${artist}'s sub-genres resonates with you most?`
+          : 'Which of these sub-genres resonates with you most?';
+      })()
+    : question.prompt;
+
+  const resolvedPrompt = lastReaction ? `${lastReaction} ${basePrompt}` : basePrompt;
 
   return (
     <StarryScreen className="flex-1">
@@ -588,7 +638,7 @@ export const QuizScreen: React.FC<Props> = ({ navigation }) => {
                   questionId={question.id}
                   prompt={resolvedPrompt}
                   subtitle={question.subtitle}
-                  options={question.options}
+                  options={resolvedOptions}
                   allowWriteIn={question.allowWriteIn}
                   writeInLabel={question.writeInLabel}
                   writeInDefaultExpanded={question.writeInDefaultExpanded}
